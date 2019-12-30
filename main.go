@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 )
 
 const (
@@ -32,8 +33,10 @@ func register(w http.ResponseWriter, r *http.Request) {
 		dir, err := os.Getwd()
 		check(err)
 
-		ViewPath := "\\src\\github.com\\yfedoruck\\todolist\\views"
-		t, err := template.ParseFiles(dir + ViewPath + "\\register.html")
+		ViewPath := filepath.FromSlash("/src/github.com/yfedoruck/todolist/views/")
+		t, err := template.ParseFiles(dir + ViewPath + "register.html")
+
+		fmt.Println(dir + ViewPath + "register.html")
 		check(err)
 
 		_ = t.Execute(w, nil)
@@ -74,9 +77,9 @@ func renderTemplate(w http.ResponseWriter, tpl string, data interface{}) {
 	dir, err := os.Getwd()
 	check(err)
 
-	ViewPath := "\\src\\github.com\\yfedoruck\\todolist\\views"
+	ViewPath := filepath.FromSlash("/src/github.com/yfedoruck/todolist/views/")
 
-	t, err := template.ParseFiles(dir + ViewPath + "\\" + tpl + ".html")
+	t, err := template.ParseFiles(dir + ViewPath + tpl + ".html")
 	check(err)
 
 	_ = t.Execute(w, data)
