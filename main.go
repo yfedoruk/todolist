@@ -61,12 +61,13 @@ func check(err error) {
 }
 
 func todoList(w http.ResponseWriter, r *http.Request) {
-	list := todoListData(1)
+	list := todoListData(UserData.id)
 	fmt.Println(list)
 
 	data := TodoListData{
 		"/css/signin.css",
 		"Todo list",
+		UserData.id,
 		list,
 	}
 
@@ -93,6 +94,7 @@ type LoginData struct {
 type TodoListData struct {
 	Css      string
 	Title    string
+	UserId   int
 	TodoList []Todo
 }
 type Todo struct {
@@ -210,9 +212,30 @@ func main() {
 	http.HandleFunc("/login", login)
 	http.HandleFunc("/todolist", todoList)
 	http.HandleFunc("/add", addTodo)
+	http.HandleFunc("/remove", removeTodo)
 
 	err := http.ListenAndServe("localhost:4000", nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
+	}
+}
+
+func removeTodo(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		err = r.ParseForm()
+		check(err)
+
+		if len(r.Form["id"]) == 0 {
+			panic("id not exists")
+		}
+		if UserData.id == 0 {
+			panic("user_id = 0")
+		}
+
+		stmt, err := db.Prepare("Delete from todo_list where id=$1")
+		check(err)
+		_, err = stmt.Exec(r.PostFormValue("id"))
+		check(err)
+		http.Redirect(w, r, "/todolist", http.StatusFound)
 	}
 }
