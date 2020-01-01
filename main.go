@@ -24,10 +24,15 @@ var (
 )
 
 func root(w http.ResponseWriter, r *http.Request) {
-	_, _ = fmt.Fprint(w, "root")
+	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
 func register(w http.ResponseWriter, r *http.Request) {
+
+	data := LoginData{
+		"/css/signin.css",
+		"Sign in",
+	}
 
 	if r.Method == "GET" {
 		dir, err := os.Getwd()
@@ -39,7 +44,7 @@ func register(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(dir + ViewPath + "register.html")
 		check(err)
 
-		_ = t.Execute(w, nil)
+		_ = t.Execute(w, data)
 	} else {
 		err = r.ParseForm()
 		check(err)
@@ -111,6 +116,10 @@ func login(w http.ResponseWriter, r *http.Request) {
 	data := LoginData{
 		"/css/signin.css",
 		"Sign in",
+	}
+
+	if UserData.id != 0 {
+		http.Redirect(w, r, "/todolist", http.StatusFound)
 	}
 
 	if r.Method == "GET" {
@@ -207,17 +216,23 @@ func main() {
 	http.Handle("/css/", http.StripPrefix("/css/", fs))
 
 	//var h Hello
-	//http.HandleFunc("/", root)
+	http.HandleFunc("/", root)
 	http.HandleFunc("/register", register)
 	http.HandleFunc("/login", login)
 	http.HandleFunc("/todolist", todoList)
 	http.HandleFunc("/add", addTodo)
 	http.HandleFunc("/remove", removeTodo)
+	http.HandleFunc("/logout", logout)
 
 	err := http.ListenAndServe("localhost:4000", nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
+}
+
+func logout(w http.ResponseWriter, r *http.Request) {
+	UserData.id = 0
+	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
 func removeTodo(w http.ResponseWriter, r *http.Request) {
