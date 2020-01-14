@@ -46,16 +46,32 @@ func register(w http.ResponseWriter, r *http.Request) {
 
 		_ = t.Execute(w, data)
 	} else {
-		err = r.ParseForm()
-		check(err)
+		registerUser(w, r)
+		http.Redirect(w, r, "/todolist", http.StatusFound)
+	}
+}
 
-		if len(r.Form["email"]) == 0 {
-			panic("email not exists")
-		}
+func registerUser(w http.ResponseWriter, r *http.Request) {
+	err = r.ParseForm()
+	check(err)
 
-		var lastInsertId int
-		err = db.QueryRow("INSERT into account (email,password,username) VALUES ($1,$2,$3) returning id;", r.Form["email"][0], r.Form["password"][0], r.Form["username"][0]).Scan(&lastInsertId)
-		check(err)
+	if len(r.Form["email"]) == 0 {
+		panic("email not exists")
+	}
+
+	//middleware.Validate(middleware.Email)(w, r)
+	//err = middleware.Email(w, r)
+	//if err != nil {
+	//	fmt.Println(err)
+	//	http.Redirect(w, r, "/register", http.StatusFound)
+	//}
+
+	var lastInsertId int
+	err = db.QueryRow("INSERT into account (email,password,username) VALUES ($1,$2,$3) returning id;", r.PostFormValue("email"), r.PostFormValue("password"), r.PostFormValue("username")).Scan(&lastInsertId)
+	check(err)
+
+	UserData = User{
+		lastInsertId,
 	}
 }
 
@@ -138,7 +154,7 @@ func login(w http.ResponseWriter, r *http.Request) {
 			panic("password not exists")
 		}
 
-		rows, err := db.Query("SELECT id, email FROM account WHERE username = $1 and password=$2 limit 1;", r.Form["username"][0], r.Form["password"][0])
+		rows, err := db.Query("SELECT id, email FROM account WHERE username = $1 and password=$2 limit 1;", r.PostFormValue("username"), r.PostFormValue("password"))
 		check(err)
 
 		if rows.Next() == false {
