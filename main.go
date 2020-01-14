@@ -32,6 +32,7 @@ func register(w http.ResponseWriter, r *http.Request) {
 	data := LoginData{
 		"/css/signin.css",
 		"Sign in",
+		"",
 	}
 
 	if r.Method == "GET" {
@@ -81,6 +82,9 @@ func check(err error) {
 	}
 }
 
+func checkUserError(err error) {
+}
+
 func todoList(w http.ResponseWriter, r *http.Request) {
 	list := todoListData(UserData.id)
 	fmt.Println(list)
@@ -110,6 +114,7 @@ func renderTemplate(w http.ResponseWriter, tpl string, data interface{}) {
 type LoginData struct {
 	Css   string
 	Title string
+	Error string
 }
 
 type TodoListData struct {
@@ -127,25 +132,26 @@ type User struct {
 	id int
 }
 
-func login(w http.ResponseWriter, r *http.Request) {
+var loginData = LoginData{
+	"/css/signin.css",
+	"Sign in",
+	"",
+}
 
-	data := LoginData{
-		"/css/signin.css",
-		"Sign in",
-	}
+func login(w http.ResponseWriter, r *http.Request) {
 
 	if UserData.id != 0 {
 		http.Redirect(w, r, "/todolist", http.StatusFound)
 	}
 
 	if r.Method == "GET" {
-		renderTemplate(w, "login", data)
+		renderTemplate(w, "login", loginData)
 	} else {
 
 		err = r.ParseForm()
 		check(err)
 
-		fmt.Println("username = " + r.PostFormValue("username"))
+		fmt.Println("username = " + r.FormValue("username"))
 
 		if len(r.Form["username"]) == 0 {
 			panic("username not exists")
@@ -158,6 +164,7 @@ func login(w http.ResponseWriter, r *http.Request) {
 		check(err)
 
 		if rows.Next() == false {
+			loginData.Error = "wrong username or password"
 			http.Redirect(w, r, "/login", http.StatusFound)
 			return
 		} else {
@@ -248,6 +255,7 @@ func main() {
 
 func logout(w http.ResponseWriter, r *http.Request) {
 	UserData.id = 0
+	loginData.Error = ""
 	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
