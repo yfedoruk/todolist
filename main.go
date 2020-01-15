@@ -4,17 +4,22 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/lib/pq"
+	"github.com/yfedoruck/todolist/middleware"
 	"html/template"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const (
 	DB_USER     = "postgres"
 	DB_PASSWORD = "1"
 	DB_NAME     = "todolist"
+
+	USERNAME_EXISTS = "username already exists"
+	EMAIL_EXISTS    = "email already exists"
 )
 
 var (
@@ -23,17 +28,63 @@ var (
 	UserData User
 )
 
+type LoginData struct {
+	Css   string
+	Title string
+	Error string
+}
+
+type RegisterData struct {
+	Css   string
+	Title string
+	Error RegisterErr
+}
+type RegisterErr struct {
+	Email    string
+	Username string
+	Password string
+}
+
+type NotesListData struct {
+	Css      string
+	Title    string
+	UserId   int
+	TodoList []Todo
+	Error    string
+}
+type Todo struct {
+	Id     int
+	Todo   string
+	Status bool
+}
+type User struct {
+	id int
+}
+
+var loginData = LoginData{
+	"/css/signin.css",
+	"Sign in",
+	"",
+}
+
+var registerData = RegisterData{
+	"/css/signin.css",
+	"Sign in",
+	RegisterErr{},
+}
+var notesListData = NotesListData{
+	"/css/signin.css",
+	"Todo list",
+	0,
+	nil,
+	"",
+}
+
 func root(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
 func register(w http.ResponseWriter, r *http.Request) {
-
-	data := LoginData{
-		"/css/signin.css",
-		"Sign in",
-		"",
-	}
 
 	if r.Method == "GET" {
 		dir, err := os.Getwd()
@@ -45,9 +96,23 @@ func register(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(dir + ViewPath + "register.html")
 		check(err)
 
-		_ = t.Execute(w, data)
+		_ = t.Execute(w, registerData)
 	} else {
+		isUniqueUsername := isUniqueUsername(r)
+		isUniqueEmail := isUniqueEmail(r)
+
+		if !isUniqueUsername || !isUniqueEmail {
+			http.Redirect(w, r, "/register", http.StatusFound)
+			return
+		}
+
 		registerUser(w, r)
+		//if err != nil {
+		//	fmt.Println(err)
+		//	http.Redirect(w, r, "/register", http.StatusFound)
+		//} else {
+		//	registerData.Error = RegisterErr{}
+		//}
 		http.Redirect(w, r, "/todolist", http.StatusFound)
 	}
 }
@@ -63,21 +128,68 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 	//middleware.Validate(middleware.Email)(w, r)
 	//err = middleware.Email(w, r)
 	//if err != nil {
-	//	fmt.Println(err)
-	//	http.Redirect(w, r, "/register", http.StatusFound)
+	//	return err
 	//}
 
 	var lastInsertId int
-	err = db.QueryRow("INSERT into account (email,password,username) VALUES ($1,$2,$3) returning id;", r.PostFormValue("email"), r.PostFormValue("password"), r.PostFormValue("username")).Scan(&lastInsertId)
-	check(err)
+	dbErr := db.QueryRow("INSERT into account (email,password,username) VALUES ($1,$2,$3) returning id;", r.PostFormValue("email"), r.PostFormValue("password"), r.PostFormValue("username")).Scan(&lastInsertId)
+	check(dbErr)
 
 	UserData = User{
 		lastInsertId,
 	}
+	registerData.Error = RegisterErr{}
+}
+
+func isUniqueUsername(r *http.Request) bool {
+	var result bool
+
+	rows, err := db.Query("SELECT id FROM account WHERE username = $1 limit 1;", r.PostFormValue("username"))
+	check(err)
+
+	if rows.Next() {
+		registerData.Error.Username = USERNAME_EXISTS
+		result = false
+	} else {
+		registerData.Error.Username = ""
+		result = true
+	}
+
+	return result
+}
+
+func isUniqueEmail(r *http.Request) bool {
+	var result bool
+
+	rows, err := db.Query("SELECT id FROM account WHERE email = $1 limit 1;", r.PostFormValue("email"))
+	check(err)
+
+	if rows.Next() {
+		registerData.Error.Email = EMAIL_EXISTS
+		result = false
+	} else {
+		registerData.Error.Email = ""
+		result = true
+	}
+
+	return result
+}
+
+func dbGetError(e error) error {
+	err := e.Error()
+	if strings.Contains(err, "account_username_key") {
+		registerData.Error.Username = USERNAME_EXISTS
+		registerData.Error.Email = ""
+	} else if strings.Contains(err, "account_email_key") {
+		registerData.Error.Email = EMAIL_EXISTS
+		registerData.Error.Username = ""
+	}
+	return e
 }
 
 func check(err error) {
 	if err != nil {
+		fmt.Println(err.Error())
 		panic(err)
 	}
 }
@@ -86,17 +198,14 @@ func checkUserError(err error) {
 }
 
 func todoList(w http.ResponseWriter, r *http.Request) {
-	list := todoListData(UserData.id)
-	fmt.Println(list)
-
-	data := TodoListData{
-		"/css/signin.css",
-		"Todo list",
-		UserData.id,
-		list,
+	if UserData.id == 0 {
+		http.Redirect(w, r, "/login", http.StatusFound)
+	} else {
+		notesListData.UserId = UserData.id
+		notesListData.TodoList = todoListData(UserData.id)
 	}
 
-	renderTemplate(w, "todolist", data)
+	renderTemplate(w, "todolist", notesListData)
 }
 
 func renderTemplate(w http.ResponseWriter, tpl string, data interface{}) {
@@ -109,33 +218,6 @@ func renderTemplate(w http.ResponseWriter, tpl string, data interface{}) {
 	check(err)
 
 	_ = t.Execute(w, data)
-}
-
-type LoginData struct {
-	Css   string
-	Title string
-	Error string
-}
-
-type TodoListData struct {
-	Css      string
-	Title    string
-	UserId   int
-	TodoList []Todo
-}
-type Todo struct {
-	Id     int
-	Todo   string
-	Status bool
-}
-type User struct {
-	id int
-}
-
-var loginData = LoginData{
-	"/css/signin.css",
-	"Sign in",
-	"",
 }
 
 func login(w http.ResponseWriter, r *http.Request) {
@@ -188,7 +270,18 @@ func login(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func addTodo(w http.ResponseWriter, r *http.Request) {
+func redirectToLogin(w http.ResponseWriter, r *http.Request) {
+	if UserData.id == 0 {
+		//panic("user_id = 0")
+		http.Redirect(w, r, "/login", http.StatusFound)
+	}
+}
+
+func addNote(w http.ResponseWriter, r *http.Request) {
+	if UserData.id == 0 {
+		http.Redirect(w, r, "/login", http.StatusFound)
+	}
+
 	if r.Method == "POST" {
 		err = r.ParseForm()
 		check(err)
@@ -197,8 +290,13 @@ func addTodo(w http.ResponseWriter, r *http.Request) {
 			panic("note not exists")
 		}
 
-		if UserData.id == 0 {
-			panic("user_id = 0")
+		err = middleware.Note(w, r)
+		if err != nil {
+			notesListData.Error = err.Error()
+			http.Redirect(w, r, "/todolist", http.StatusFound)
+			return
+		} else {
+			notesListData.Error = ""
 		}
 
 		var lastInsertId int
@@ -243,7 +341,7 @@ func main() {
 	http.HandleFunc("/register", register)
 	http.HandleFunc("/login", login)
 	http.HandleFunc("/todolist", todoList)
-	http.HandleFunc("/add", addTodo)
+	http.HandleFunc("/add", addNote)
 	http.HandleFunc("/remove", removeTodo)
 	http.HandleFunc("/logout", logout)
 
@@ -256,6 +354,7 @@ func main() {
 func logout(w http.ResponseWriter, r *http.Request) {
 	UserData.id = 0
 	loginData.Error = ""
+	notesListData.Error = ""
 	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
