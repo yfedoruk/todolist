@@ -13,10 +13,10 @@
 
     <div class="form-group {{if .Error }}has-error{{end}}">
         <label for="inputEmail" class="">User name</label>
-        <input type="text" id="inputEmail" class="form-control" placeholder="User name" required autofocus name="username">
+        <input type="text" id="inputEmail" class="form-control" placeholder="User name" required autofocus name="username" value="{{.PreFill.Username}}">
 
         <label for="inputPassword" class="">Password</label>
-        <input type="password" id="inputPassword" class="form-control" placeholder="Password" required name="password">
+        <input type="password" id="inputPassword" class="form-control" placeholder="Password" required name="password" value="{{.PreFill.Password}}">
 
         {{if .Error }}
             <span class="help-block">{{.Error}}</span>

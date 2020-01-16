@@ -10,16 +10,15 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 const (
-	DB_USER     = "postgres"
-	DB_PASSWORD = "1"
-	DB_NAME     = "todolist"
+	DbUser     = "postgres"
+	DbPassword = "1"
+	DbName     = "todolist"
 
-	USERNAME_EXISTS = "username already exists"
-	EMAIL_EXISTS    = "email already exists"
+	UsernameExists = "username already exists"
+	EmailExists    = "email already exists"
 )
 
 var (
@@ -29,9 +28,10 @@ var (
 )
 
 type LoginData struct {
-	Css   string
-	Title string
-	Error string
+	Css     string
+	Title   string
+	Error   string
+	PreFill LoginField
 }
 
 type RegisterData struct {
@@ -47,6 +47,10 @@ type RegisterErr struct {
 }
 type RegisterField struct {
 	Email    string
+	Username string
+	Password string
+}
+type LoginField struct {
 	Username string
 	Password string
 }
@@ -71,6 +75,7 @@ var loginData = LoginData{
 	"/css/signin.css",
 	"Sign in",
 	"",
+	LoginField{},
 }
 
 var registerData = RegisterData{
@@ -122,7 +127,7 @@ func register(w http.ResponseWriter, r *http.Request) {
 			registerData.Error = RegisterErr{}
 		}
 
-		registerUser(w, r)
+		registerUser(r)
 		//if err != nil {
 		//	fmt.Println(err)
 		//	http.Redirect(w, r, "/register", http.StatusFound)
@@ -133,7 +138,7 @@ func register(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func registerUser(w http.ResponseWriter, r *http.Request) {
+func registerUser(r *http.Request) {
 	err = r.ParseForm()
 	check(err)
 
@@ -164,7 +169,7 @@ func isUniqueUsername(r *http.Request) bool {
 	check(err)
 
 	if rows.Next() {
-		registerData.Error.Username = USERNAME_EXISTS
+		registerData.Error.Username = UsernameExists
 		result = false
 	} else {
 		registerData.Error.Username = ""
@@ -177,11 +182,12 @@ func isUniqueUsername(r *http.Request) bool {
 func isUniqueEmail(r *http.Request) bool {
 	var result bool
 
+	//strings.Contains(err, "account_username_key")
 	rows, err := db.Query("SELECT id FROM account WHERE email = $1 limit 1;", r.PostFormValue("email"))
 	check(err)
 
 	if rows.Next() {
-		registerData.Error.Email = EMAIL_EXISTS
+		registerData.Error.Email = EmailExists
 		result = false
 	} else {
 		registerData.Error.Email = ""
@@ -191,26 +197,11 @@ func isUniqueEmail(r *http.Request) bool {
 	return result
 }
 
-func dbGetError(e error) error {
-	err := e.Error()
-	if strings.Contains(err, "account_username_key") {
-		registerData.Error.Username = USERNAME_EXISTS
-		registerData.Error.Email = ""
-	} else if strings.Contains(err, "account_email_key") {
-		registerData.Error.Email = EMAIL_EXISTS
-		registerData.Error.Username = ""
-	}
-	return e
-}
-
 func check(err error) {
 	if err != nil {
 		fmt.Println(err.Error())
 		panic(err)
 	}
-}
-
-func checkUserError(err error) {
 }
 
 func todoList(w http.ResponseWriter, r *http.Request) {
@@ -263,6 +254,10 @@ func login(w http.ResponseWriter, r *http.Request) {
 
 		if rows.Next() == false {
 			loginData.Error = "wrong username or password"
+			loginData.PreFill = LoginField{
+				Username: r.PostFormValue("username"),
+				Password: r.PostFormValue("password"),
+			}
 			http.Redirect(w, r, "/login", http.StatusFound)
 			return
 		} else {
@@ -283,13 +278,6 @@ func login(w http.ResponseWriter, r *http.Request) {
 		//check(err)
 		//fmt.Println("email = " + email)
 
-	}
-}
-
-func redirectToLogin(w http.ResponseWriter, r *http.Request) {
-	if UserData.id == 0 {
-		//panic("user_id = 0")
-		http.Redirect(w, r, "/login", http.StatusFound)
 	}
 }
 
@@ -343,7 +331,7 @@ func todoListData(userId int) []Todo {
 }
 
 func main() {
-	dbinfo := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=disable", DB_USER, DB_PASSWORD, DB_NAME)
+	dbinfo := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=disable", DbUser, DbPassword, DbName)
 	db, err = sql.Open("postgres", dbinfo)
 	check(err)
 	defer db.Close()
