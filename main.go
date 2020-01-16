@@ -104,15 +104,41 @@ func register(w http.ResponseWriter, r *http.Request) {
 
 		ViewPath := filepath.FromSlash("/src/github.com/yfedoruck/todolist/views/")
 		t, err := template.ParseFiles(dir + ViewPath + "register.html")
-
-		fmt.Println(dir + ViewPath + "register.html")
 		check(err)
 
 		_ = t.Execute(w, registerData)
 	} else {
+		var validation = true
+
+		errUsername := middleware.Username(r)
+		if errUsername != nil {
+			registerData.Error.Username = errUsername.Error()
+			validation = false
+		} else {
+			registerData.Error.Username = ""
+		}
+
+		errEmail := middleware.Email(r)
+		if errEmail != nil {
+			registerData.Error.Email = errEmail.Error()
+			validation = false
+		} else {
+			registerData.Error.Email = ""
+		}
+
+		if !validation {
+			registerData.PreFill = RegisterField{
+				r.PostFormValue("email"),
+				r.PostFormValue("username"),
+				r.PostFormValue("password"),
+			}
+
+			http.Redirect(w, r, "/register", http.StatusFound)
+			return
+		}
+
 		isUniqueUsername := isUniqueUsername(r)
 		isUniqueEmail := isUniqueEmail(r)
-		//register := isUniqueEmail(r)
 
 		if !isUniqueUsername || !isUniqueEmail {
 			registerData.PreFill = RegisterField{
@@ -128,12 +154,6 @@ func register(w http.ResponseWriter, r *http.Request) {
 		}
 
 		registerUser(r)
-		//if err != nil {
-		//	fmt.Println(err)
-		//	http.Redirect(w, r, "/register", http.StatusFound)
-		//} else {
-		//	registerData.Error = RegisterErr{}
-		//}
 		http.Redirect(w, r, "/todolist", http.StatusFound)
 	}
 }
@@ -145,12 +165,6 @@ func registerUser(r *http.Request) {
 	if len(r.Form["email"]) == 0 {
 		panic("email not exists")
 	}
-
-	//middleware.Validate(middleware.Email)(w, r)
-	//err = middleware.Email(w, r)
-	//if err != nil {
-	//	return err
-	//}
 
 	var lastInsertId int
 	dbErr := db.QueryRow("INSERT into account (email,password,username) VALUES ($1,$2,$3) returning id;", r.PostFormValue("email"), r.PostFormValue("password"), r.PostFormValue("username")).Scan(&lastInsertId)
@@ -294,7 +308,7 @@ func addNote(w http.ResponseWriter, r *http.Request) {
 			panic("note not exists")
 		}
 
-		err = middleware.Note(w, r)
+		err = middleware.Note(r)
 		if err != nil {
 			notesListData.Error = err.Error()
 			http.Redirect(w, r, "/todolist", http.StatusFound)
@@ -312,7 +326,7 @@ func addNote(w http.ResponseWriter, r *http.Request) {
 }
 
 func todoListData(userId int) []Todo {
-	rows, err := db.Query("SELECT id, todo, status FROM  public.todo_list where user_id = $1", userId)
+	rows, err := db.Query("SELECT id, todo, status FROM  public.todo_list where user_id = $1 ORDER BY id DESC", userId)
 	check(err)
 
 	var id int
@@ -330,11 +344,16 @@ func todoListData(userId int) []Todo {
 	return list
 }
 
-func main() {
-	dbinfo := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=disable", DbUser, DbPassword, DbName)
-	db, err = sql.Open("postgres", dbinfo)
+func closeDb() {
+	err = db.Close()
 	check(err)
-	defer db.Close()
+}
+
+func main() {
+	dbInfo := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=disable", DbUser, DbPassword, DbName)
+	db, err = sql.Open("postgres", dbInfo)
+	check(err)
+	defer closeDb()
 
 	fs := http.FileServer(http.Dir("./src/github.com/yfedoruck/todolist/static/css"))
 	//http.Handle("/src/todolist/static/css/signin.css", fs)
@@ -359,6 +378,8 @@ func logout(w http.ResponseWriter, r *http.Request) {
 	UserData.id = 0
 	loginData.Error = ""
 	notesListData.Error = ""
+	registerData.Error = RegisterErr{}
+	registerData.PreFill = RegisterField{}
 	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
