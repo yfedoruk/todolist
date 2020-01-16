@@ -254,8 +254,6 @@ func login(w http.ResponseWriter, r *http.Request) {
 		err = r.ParseForm()
 		check(err)
 
-		fmt.Println("username = " + r.FormValue("username"))
-
 		if len(r.Form["username"]) == 0 {
 			panic("username not exists")
 		}
@@ -287,11 +285,6 @@ func login(w http.ResponseWriter, r *http.Request) {
 
 			http.Redirect(w, r, "/todolist", http.StatusFound)
 		}
-		//var email string
-		//err = rows.Scan(&email)
-		//check(err)
-		//fmt.Println("email = " + email)
-
 	}
 }
 
