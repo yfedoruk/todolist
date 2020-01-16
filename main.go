@@ -35,11 +35,17 @@ type LoginData struct {
 }
 
 type RegisterData struct {
-	Css   string
-	Title string
-	Error RegisterErr
+	Css     string
+	Title   string
+	Error   RegisterErr
+	PreFill RegisterField
 }
 type RegisterErr struct {
+	Email    string
+	Username string
+	Password string
+}
+type RegisterField struct {
 	Email    string
 	Username string
 	Password string
@@ -71,6 +77,7 @@ var registerData = RegisterData{
 	"/css/signin.css",
 	"Sign in",
 	RegisterErr{},
+	RegisterField{},
 }
 var notesListData = NotesListData{
 	"/css/signin.css",
@@ -100,10 +107,19 @@ func register(w http.ResponseWriter, r *http.Request) {
 	} else {
 		isUniqueUsername := isUniqueUsername(r)
 		isUniqueEmail := isUniqueEmail(r)
+		//register := isUniqueEmail(r)
 
 		if !isUniqueUsername || !isUniqueEmail {
+			registerData.PreFill = RegisterField{
+				r.PostFormValue("email"),
+				r.PostFormValue("username"),
+				r.PostFormValue("password"),
+			}
 			http.Redirect(w, r, "/register", http.StatusFound)
 			return
+		} else {
+			registerData.PreFill = RegisterField{}
+			registerData.Error = RegisterErr{}
 		}
 
 		registerUser(w, r)

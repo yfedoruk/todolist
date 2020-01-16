@@ -11,7 +11,7 @@
 
     <div class="form-group {{if .Error.Email }}has-error{{end}}">
         <label for="inputEmail" class="">Email</label>
-        <input type="text" id="inputEmail" class="form-control" placeholder="User email" required autofocus name="email">
+        <input type="text" id="inputEmail" class="form-control" placeholder="User email" required autofocus name="email"  value="{{.PreFill.Email}}">
         {{if .Error.Email }}
             <span class="help-block">{{.Error.Email}}</span>
         {{end}}
@@ -19,14 +19,14 @@
 
     <div class="form-group {{if .Error.Username }}has-error{{end}}">
         <label for="inputUsername" class="">Name</label>
-        <input type="text" id="inputUsername" class="form-control" placeholder="User name"  autocomplete="off" required autofocus name="username" value="">
+        <input type="text" id="inputUsername" class="form-control" placeholder="User name"  autocomplete="off" required autofocus name="username" value="{{.PreFill.Username}}">
         {{if .Error.Username }}
             <span class="help-block">{{.Error.Username}}</span>
         {{end}}
     </div>
 
         <label for="inputPassword" class="">Password</label>
-        <input type="password" id="inputPassword" class="form-control" placeholder="Password"  autocomplete="off" required name="password">
+        <input type="password" id="inputPassword" class="form-control" placeholder="Password"  autocomplete="off" required name="password"  value="{{.PreFill.Password}}">
 
 
     <a href="/login">Login</a>
