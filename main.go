@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	_ "github.com/lib/pq"
 	"github.com/yfedoruck/todolist/middleware"
@@ -19,6 +20,7 @@ const (
 
 	UsernameExists = "username already exists"
 	EmailExists    = "email already exists"
+	LoginFails     = "wrong username or password"
 )
 
 var (
@@ -162,10 +164,6 @@ func registerUser(r *http.Request) {
 	err = r.ParseForm()
 	check(err)
 
-	if len(r.Form["email"]) == 0 {
-		panic("email not exists")
-	}
-
 	var lastInsertId int
 	dbErr := db.QueryRow("INSERT into account (email,password,username) VALUES ($1,$2,$3) returning id;", r.PostFormValue("email"), r.PostFormValue("password"), r.PostFormValue("username")).Scan(&lastInsertId)
 	check(dbErr)
@@ -173,7 +171,43 @@ func registerUser(r *http.Request) {
 	UserData = User{
 		lastInsertId,
 	}
+	clearRegisterForm()
+}
+
+func loginUser(r *http.Request) (int, error) {
+	err = r.ParseForm()
+	check(err)
+
+	if r.PostFormValue("username") == "" {
+		return 0, errors.New("username not exists")
+	}
+
+	if r.PostFormValue("password") == "" {
+		return 0, errors.New("password not exists")
+	}
+
+	rows, err := db.Query("SELECT id, email FROM account WHERE username = $1 and password=$2 limit 1;", r.PostFormValue("username"), r.PostFormValue("password"))
+	check(err)
+
+	if rows.Next() == false {
+		return 0, errors.New(LoginFails)
+	} else {
+		var id int
+		var email string
+		err = rows.Scan(&id, &email)
+		check(err)
+		return id, nil
+	}
+}
+
+func clearRegisterForm() {
 	registerData.Error = RegisterErr{}
+	registerData.PreFill = RegisterField{}
+}
+
+func clearLoginForm() {
+	loginData.Error = ""
+	loginData.PreFill = LoginField{}
 }
 
 func isUniqueUsername(r *http.Request) bool {
@@ -250,39 +284,19 @@ func login(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		renderTemplate(w, "login", loginData)
 	} else {
-
-		err = r.ParseForm()
-		check(err)
-
-		if len(r.Form["username"]) == 0 {
-			panic("username not exists")
-		}
-		if len(r.Form["password"]) == 0 {
-			panic("password not exists")
-		}
-
-		rows, err := db.Query("SELECT id, email FROM account WHERE username = $1 and password=$2 limit 1;", r.PostFormValue("username"), r.PostFormValue("password"))
-		check(err)
-
-		if rows.Next() == false {
-			loginData.Error = "wrong username or password"
+		id, err := loginUser(r)
+		if err != nil {
+			loginData.Error = err.Error()
 			loginData.PreFill = LoginField{
 				Username: r.PostFormValue("username"),
 				Password: r.PostFormValue("password"),
 			}
 			http.Redirect(w, r, "/login", http.StatusFound)
-			return
 		} else {
-			var id int
-			var email string
-			err = rows.Scan(&id, &email)
-			check(err)
-			fmt.Println("id = " + string(id))
-			fmt.Println("email = " + email)
 			UserData = User{
 				id,
 			}
-
+			clearLoginForm()
 			http.Redirect(w, r, "/todolist", http.StatusFound)
 		}
 	}
