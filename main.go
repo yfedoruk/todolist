@@ -73,94 +73,75 @@ type User struct {
 	id int
 }
 
-var loginData = LoginData{
-	"/css/signin.css",
-	"Sign in",
-	"",
-	LoginField{},
-}
-
-var registerData = RegisterData{
-	"/css/signin.css",
-	"Sign in",
-	RegisterErr{},
-	RegisterField{},
-}
-var notesListData = NotesListData{
-	"/css/signin.css",
-	"Todo list",
-	0,
-	nil,
-	"",
-}
-
 func root(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
-func register(w http.ResponseWriter, r *http.Request) {
+func register(regData RegisterData) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-	if r.Method == "GET" {
-		dir, err := os.Getwd()
-		check(err)
+		if r.Method == "GET" {
+			dir, err := os.Getwd()
+			check(err)
 
-		ViewPath := filepath.FromSlash("/src/github.com/yfedoruck/todolist/views/")
-		t, err := template.ParseFiles(dir + ViewPath + "register.html")
-		check(err)
+			ViewPath := filepath.FromSlash("/src/github.com/yfedoruck/todolist/views/")
+			t, err := template.ParseFiles(dir + ViewPath + "register.html")
+			check(err)
 
-		_ = t.Execute(w, registerData)
-	} else {
-		var validation = true
-
-		errUsername := middleware.Username(r)
-		if errUsername != nil {
-			registerData.Error.Username = errUsername.Error()
-			validation = false
+			_ = t.Execute(w, regData)
 		} else {
-			registerData.Error.Username = ""
-		}
+			var validation = true
 
-		errEmail := middleware.Email(r)
-		if errEmail != nil {
-			registerData.Error.Email = errEmail.Error()
-			validation = false
-		} else {
-			registerData.Error.Email = ""
-		}
-
-		if !validation {
-			registerData.PreFill = RegisterField{
-				r.PostFormValue("email"),
-				r.PostFormValue("username"),
-				r.PostFormValue("password"),
+			errUsername := middleware.Username(r)
+			if errUsername != nil {
+				regData.Error.Username = errUsername.Error()
+				validation = false
+			} else {
+				regData.Error.Username = ""
 			}
 
-			http.Redirect(w, r, "/register", http.StatusFound)
-			return
-		}
-
-		isUniqueUsername := isUniqueUsername(r)
-		isUniqueEmail := isUniqueEmail(r)
-
-		if !isUniqueUsername || !isUniqueEmail {
-			registerData.PreFill = RegisterField{
-				r.PostFormValue("email"),
-				r.PostFormValue("username"),
-				r.PostFormValue("password"),
+			errEmail := middleware.Email(r)
+			if errEmail != nil {
+				regData.Error.Email = errEmail.Error()
+				validation = false
+			} else {
+				regData.Error.Email = ""
 			}
-			http.Redirect(w, r, "/register", http.StatusFound)
-			return
-		} else {
-			registerData.PreFill = RegisterField{}
-			registerData.Error = RegisterErr{}
-		}
 
-		registerUser(r)
-		http.Redirect(w, r, "/todolist", http.StatusFound)
-	}
+			if !validation {
+				regData.PreFill = RegisterField{
+					r.PostFormValue("email"),
+					r.PostFormValue("username"),
+					r.PostFormValue("password"),
+				}
+
+				http.Redirect(w, r, "/register", http.StatusFound)
+				return
+			}
+
+			isUniqueUsername := isUniqueUsername(r, regData)
+			isUniqueEmail := isUniqueEmail(r, regData)
+
+			if !isUniqueUsername || !isUniqueEmail {
+				regData.PreFill = RegisterField{
+					r.PostFormValue("email"),
+					r.PostFormValue("username"),
+					r.PostFormValue("password"),
+				}
+				http.Redirect(w, r, "/register", http.StatusFound)
+				return
+			} else {
+				regData.PreFill = RegisterField{}
+				regData.Error = RegisterErr{}
+			}
+
+			registerUser(r, regData)
+			http.Redirect(w, r, "/todolist", http.StatusFound)
+		}
+	})
 }
 
-func registerUser(r *http.Request) {
+func registerUser(r *http.Request, registerData RegisterData) {
 	err = r.ParseForm()
 	check(err)
 
@@ -171,10 +152,10 @@ func registerUser(r *http.Request) {
 	UserData = User{
 		lastInsertId,
 	}
-	clearRegisterForm()
+	clearRegisterForm(registerData)
 }
 
-func loginUser(r *http.Request) (int, error) {
+func loginUser(db *sql.DB, r *http.Request) (int, error) {
 	err = r.ParseForm()
 	check(err)
 
@@ -200,34 +181,34 @@ func loginUser(r *http.Request) (int, error) {
 	}
 }
 
-func clearRegisterForm() {
-	registerData.Error = RegisterErr{}
-	registerData.PreFill = RegisterField{}
+func clearRegisterForm(data RegisterData) {
+	data.Error = RegisterErr{}
+	data.PreFill = RegisterField{}
 }
 
-func clearLoginForm() {
-	loginData.Error = ""
-	loginData.PreFill = LoginField{}
+func clearLoginForm(ld LoginData) {
+	ld.Error = ""
+	ld.PreFill = LoginField{}
 }
 
-func isUniqueUsername(r *http.Request) bool {
+func isUniqueUsername(r *http.Request, data RegisterData) bool {
 	var result bool
 
 	rows, err := db.Query("SELECT id FROM account WHERE username = $1 limit 1;", r.PostFormValue("username"))
 	check(err)
 
 	if rows.Next() {
-		registerData.Error.Username = UsernameExists
+		data.Error.Username = UsernameExists
 		result = false
 	} else {
-		registerData.Error.Username = ""
+		data.Error.Username = ""
 		result = true
 	}
 
 	return result
 }
 
-func isUniqueEmail(r *http.Request) bool {
+func isUniqueEmail(r *http.Request, data RegisterData) bool {
 	var result bool
 
 	//strings.Contains(err, "account_username_key")
@@ -235,10 +216,10 @@ func isUniqueEmail(r *http.Request) bool {
 	check(err)
 
 	if rows.Next() {
-		registerData.Error.Email = EmailExists
+		data.Error.Email = EmailExists
 		result = false
 	} else {
-		registerData.Error.Email = ""
+		data.Error.Email = ""
 		result = true
 	}
 
@@ -252,15 +233,17 @@ func check(err error) {
 	}
 }
 
-func todoList(w http.ResponseWriter, r *http.Request) {
-	if UserData.id == 0 {
-		http.Redirect(w, r, "/login", http.StatusFound)
-	} else {
-		notesListData.UserId = UserData.id
-		notesListData.TodoList = todoListData(UserData.id)
-	}
+func todoListHandler(data NotesListData) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if UserData.id == 0 {
+			http.Redirect(w, r, "/login", http.StatusFound)
+		} else {
+			data.UserId = UserData.id
+			data.TodoList = todoListData(UserData.id)
+		}
 
-	renderTemplate(w, "todolist", notesListData)
+		renderTemplate(w, "todolist", data)
+	})
 }
 
 func renderTemplate(w http.ResponseWriter, tpl string, data interface{}) {
@@ -275,61 +258,64 @@ func renderTemplate(w http.ResponseWriter, tpl string, data interface{}) {
 	_ = t.Execute(w, data)
 }
 
-func login(w http.ResponseWriter, r *http.Request) {
-
-	if UserData.id != 0 {
-		http.Redirect(w, r, "/todolist", http.StatusFound)
-	}
-
-	if r.Method == "GET" {
-		renderTemplate(w, "login", loginData)
-	} else {
-		id, err := loginUser(r)
-		if err != nil {
-			loginData.Error = err.Error()
-			loginData.PreFill = LoginField{
-				Username: r.PostFormValue("username"),
-				Password: r.PostFormValue("password"),
-			}
-			http.Redirect(w, r, "/login", http.StatusFound)
-		} else {
-			UserData = User{
-				id,
-			}
-			clearLoginForm()
+func loginHandler(db *sql.DB, loginData LoginData) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if UserData.id != 0 {
 			http.Redirect(w, r, "/todolist", http.StatusFound)
 		}
-	}
+
+		if r.Method == "GET" {
+			renderTemplate(w, "login", loginData)
+		} else {
+			id, err := loginUser(db, r)
+			if err != nil {
+				loginData.Error = err.Error()
+				loginData.PreFill = LoginField{
+					Username: r.PostFormValue("username"),
+					Password: r.PostFormValue("password"),
+				}
+				http.Redirect(w, r, "/login", http.StatusFound)
+			} else {
+				UserData = User{
+					id,
+				}
+				clearLoginForm(loginData)
+				http.Redirect(w, r, "/todolist", http.StatusFound)
+			}
+		}
+	})
 }
 
-func addNote(w http.ResponseWriter, r *http.Request) {
-	if UserData.id == 0 {
-		http.Redirect(w, r, "/login", http.StatusFound)
-	}
-
-	if r.Method == "POST" {
-		err = r.ParseForm()
-		check(err)
-
-		if len(r.Form["note"]) == 0 {
-			panic("note not exists")
+func addNoteHandler(notes NotesListData) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if UserData.id == 0 {
+			http.Redirect(w, r, "/login", http.StatusFound)
 		}
 
-		err = middleware.Note(r)
-		if err != nil {
-			notesListData.Error = err.Error()
+		if r.Method == "POST" {
+			err = r.ParseForm()
+			check(err)
+
+			if len(r.Form["note"]) == 0 {
+				panic("note not exists")
+			}
+
+			err = middleware.Note(r)
+			if err != nil {
+				notes.Error = err.Error()
+				http.Redirect(w, r, "/todolist", http.StatusFound)
+				return
+			} else {
+				notes.Error = ""
+			}
+
+			var lastInsertId int
+			err = db.QueryRow("INSERT into public.todo_list (user_id,todo,status) VALUES ($1,$2,$3) returning id;", UserData.id, r.PostFormValue("note"), true).Scan(&lastInsertId)
+			check(err)
+
 			http.Redirect(w, r, "/todolist", http.StatusFound)
-			return
-		} else {
-			notesListData.Error = ""
 		}
-
-		var lastInsertId int
-		err = db.QueryRow("INSERT into public.todo_list (user_id,todo,status) VALUES ($1,$2,$3) returning id;", UserData.id, r.PostFormValue("note"), true).Scan(&lastInsertId)
-		check(err)
-
-		http.Redirect(w, r, "/todolist", http.StatusFound)
-	}
+	})
 }
 
 func todoListData(userId int) []Todo {
@@ -362,18 +348,38 @@ func main() {
 	check(err)
 	defer closeDb()
 
+	var loginData = LoginData{
+		"/css/signin.css",
+		"Sign in",
+		"",
+		LoginField{},
+	}
+	var notesListData = NotesListData{
+		"/css/signin.css",
+		"Todo list",
+		0,
+		nil,
+		"",
+	}
+	var registerData = RegisterData{
+		"/css/signin.css",
+		"Sign in",
+		RegisterErr{},
+		RegisterField{},
+	}
+
 	fs := http.FileServer(http.Dir("./src/github.com/yfedoruck/todolist/static/css"))
 	//http.Handle("/src/todolist/static/css/signin.css", fs)
 	http.Handle("/css/", http.StripPrefix("/css/", fs))
 
 	//var h Hello
 	http.HandleFunc("/", root)
-	http.HandleFunc("/register", register)
-	http.HandleFunc("/login", login)
-	http.HandleFunc("/todolist", todoList)
-	http.HandleFunc("/add", addNote)
-	http.HandleFunc("/remove", removeTodo)
-	http.HandleFunc("/logout", logout)
+	http.Handle("/register", register(registerData))
+	http.Handle("/login", loginHandler(db, loginData))
+	http.Handle("/todolist", todoListHandler(notesListData))
+	http.Handle("/add", addNoteHandler(notesListData))
+	http.Handle("/remove", removeTodoHandler())
+	http.Handle("/logout", logoutHandler(loginData, notesListData, registerData))
 
 	err := http.ListenAndServe("localhost:4000", nil)
 	if err != nil {
@@ -381,31 +387,35 @@ func main() {
 	}
 }
 
-func logout(w http.ResponseWriter, r *http.Request) {
-	UserData.id = 0
-	loginData.Error = ""
-	notesListData.Error = ""
-	registerData.Error = RegisterErr{}
-	registerData.PreFill = RegisterField{}
-	http.Redirect(w, r, "/login", http.StatusFound)
+func logoutHandler(ld LoginData, listData NotesListData, regData RegisterData) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		UserData.id = 0
+		ld.Error = ""
+		listData.Error = ""
+		regData.Error = RegisterErr{}
+		regData.PreFill = RegisterField{}
+		http.Redirect(w, r, "/login", http.StatusFound)
+	})
 }
 
-func removeTodo(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "POST" {
-		err = r.ParseForm()
-		check(err)
+func removeTodoHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			err = r.ParseForm()
+			check(err)
 
-		if len(r.Form["id"]) == 0 {
-			panic("id not exists")
-		}
-		if UserData.id == 0 {
-			panic("user_id = 0")
-		}
+			if len(r.Form["id"]) == 0 {
+				panic("id not exists")
+			}
+			if UserData.id == 0 {
+				panic("user_id = 0")
+			}
 
-		stmt, err := db.Prepare("Delete from todo_list where id=$1")
-		check(err)
-		_, err = stmt.Exec(r.PostFormValue("id"))
-		check(err)
-		http.Redirect(w, r, "/todolist", http.StatusFound)
-	}
+			stmt, err := db.Prepare("Delete from todo_list where id=$1")
+			check(err)
+			_, err = stmt.Exec(r.PostFormValue("id"))
+			check(err)
+			http.Redirect(w, r, "/todolist", http.StatusFound)
+		}
+	})
 }
