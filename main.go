@@ -77,7 +77,7 @@ func root(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
-func register(regData RegisterData) http.Handler {
+func register(regData *RegisterData) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		if r.Method == "GET" {
@@ -141,7 +141,7 @@ func register(regData RegisterData) http.Handler {
 	})
 }
 
-func registerUser(r *http.Request, registerData RegisterData) {
+func registerUser(r *http.Request, registerData *RegisterData) {
 	err = r.ParseForm()
 	check(err)
 
@@ -181,17 +181,17 @@ func loginUser(db *sql.DB, r *http.Request) (int, error) {
 	}
 }
 
-func clearRegisterForm(data RegisterData) {
+func clearRegisterForm(data *RegisterData) {
 	data.Error = RegisterErr{}
 	data.PreFill = RegisterField{}
 }
 
-func clearLoginForm(ld LoginData) {
+func clearLoginForm(ld *LoginData) {
 	ld.Error = ""
 	ld.PreFill = LoginField{}
 }
 
-func isUniqueUsername(r *http.Request, data RegisterData) bool {
+func isUniqueUsername(r *http.Request, data *RegisterData) bool {
 	var result bool
 
 	rows, err := db.Query("SELECT id FROM account WHERE username = $1 limit 1;", r.PostFormValue("username"))
@@ -208,7 +208,7 @@ func isUniqueUsername(r *http.Request, data RegisterData) bool {
 	return result
 }
 
-func isUniqueEmail(r *http.Request, data RegisterData) bool {
+func isUniqueEmail(r *http.Request, data *RegisterData) bool {
 	var result bool
 
 	//strings.Contains(err, "account_username_key")
@@ -258,7 +258,7 @@ func renderTemplate(w http.ResponseWriter, tpl string, data interface{}) {
 	_ = t.Execute(w, data)
 }
 
-func loginHandler(db *sql.DB, loginData LoginData) http.Handler {
+func loginHandler(db *sql.DB, loginData *LoginData) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if UserData.id != 0 {
 			http.Redirect(w, r, "/todolist", http.StatusFound)
@@ -330,7 +330,6 @@ func todoListData(userId int) []Todo {
 		err = rows.Scan(&id, &todo, &status)
 		check(err)
 		td := Todo{id, todo, status}
-		fmt.Println(userId, id, todo, status)
 		list = append(list, td)
 	}
 
@@ -374,12 +373,12 @@ func main() {
 
 	//var h Hello
 	http.HandleFunc("/", root)
-	http.Handle("/register", register(registerData))
-	http.Handle("/login", loginHandler(db, loginData))
+	http.Handle("/register", register(&registerData))
+	http.Handle("/login", loginHandler(db, &loginData))
 	http.Handle("/todolist", todoListHandler(notesListData))
 	http.Handle("/add", addNoteHandler(notesListData))
 	http.Handle("/remove", removeTodoHandler())
-	http.Handle("/logout", logoutHandler(loginData, notesListData, registerData))
+	http.Handle("/logout", logoutHandler(&loginData, notesListData, &registerData))
 
 	err := http.ListenAndServe("localhost:4000", nil)
 	if err != nil {
@@ -387,7 +386,7 @@ func main() {
 	}
 }
 
-func logoutHandler(ld LoginData, listData NotesListData, regData RegisterData) http.Handler {
+func logoutHandler(ld *LoginData, listData NotesListData, regData *RegisterData) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		UserData.id = 0
 		ld.Error = ""
