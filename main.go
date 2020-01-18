@@ -339,6 +339,39 @@ func closeDb(db *sql.DB) {
 	check(err)
 }
 
+func logoutHandler(ld *LoginData, listData NotesListData, regData *RegisterData) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		UserData.id = 0
+		ld.Error = ""
+		listData.Error = ""
+		regData.Error = RegisterErr{}
+		regData.PreFill = RegisterField{}
+		http.Redirect(w, r, "/login", http.StatusFound)
+	})
+}
+
+func removeTodoHandler(db *sql.DB) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			err := r.ParseForm()
+			check(err)
+
+			if len(r.Form["id"]) == 0 {
+				panic("id not exists")
+			}
+			if UserData.id == 0 {
+				panic("user_id = 0")
+			}
+
+			stmt, err := db.Prepare("Delete from todo_list where id=$1")
+			check(err)
+			_, err = stmt.Exec(r.PostFormValue("id"))
+			check(err)
+			http.Redirect(w, r, "/todolist", http.StatusFound)
+		}
+	})
+}
+
 func main() {
 	dbInfo := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=disable", DbUser, DbPassword, DbName)
 	db, err := sql.Open("postgres", dbInfo)
@@ -382,37 +415,4 @@ func main() {
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
-}
-
-func logoutHandler(ld *LoginData, listData NotesListData, regData *RegisterData) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		UserData.id = 0
-		ld.Error = ""
-		listData.Error = ""
-		regData.Error = RegisterErr{}
-		regData.PreFill = RegisterField{}
-		http.Redirect(w, r, "/login", http.StatusFound)
-	})
-}
-
-func removeTodoHandler(db *sql.DB) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "POST" {
-			err := r.ParseForm()
-			check(err)
-
-			if len(r.Form["id"]) == 0 {
-				panic("id not exists")
-			}
-			if UserData.id == 0 {
-				panic("user_id = 0")
-			}
-
-			stmt, err := db.Prepare("Delete from todo_list where id=$1")
-			check(err)
-			_, err = stmt.Exec(r.PostFormValue("id"))
-			check(err)
-			http.Redirect(w, r, "/todolist", http.StatusFound)
-		}
-	})
 }
