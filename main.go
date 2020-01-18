@@ -143,9 +143,6 @@ func registerUser(r *http.Request, registerData *RegisterData, db *sql.DB) int {
 	dbErr := db.QueryRow("INSERT into account (email,password,username) VALUES ($1,$2,$3) returning id;", r.PostFormValue("email"), r.PostFormValue("password"), r.PostFormValue("username")).Scan(&lastInsertId)
 	check(dbErr)
 
-	//UserData = User{
-	//	lastInsertId,
-	//}
 	clearRegisterForm(registerData)
 
 	return lastInsertId
@@ -396,7 +393,6 @@ func main() {
 	user := &User{}
 
 	fs := http.FileServer(http.Dir("./src/github.com/yfedoruck/todolist/static/css"))
-	//http.Handle("/src/todolist/static/css/signin.css", fs)
 	http.Handle("/css/", http.StripPrefix("/css/", fs))
 
 	//var h Hello
