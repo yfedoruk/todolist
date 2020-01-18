@@ -23,10 +23,6 @@ const (
 	LoginFails     = "wrong username or password"
 )
 
-var (
-	UserData User
-)
-
 type LoginData struct {
 	Css     string
 	Title   string
@@ -75,7 +71,7 @@ func root(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
-func register(regData *RegisterData, db *sql.DB) http.Handler {
+func register(regData *RegisterData, db *sql.DB, user *User) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		if r.Method == "GET" {
@@ -133,13 +129,13 @@ func register(regData *RegisterData, db *sql.DB) http.Handler {
 				regData.Error = RegisterErr{}
 			}
 
-			registerUser(r, regData, db)
+			user.id = registerUser(r, regData, db)
 			http.Redirect(w, r, "/todolist", http.StatusFound)
 		}
 	})
 }
 
-func registerUser(r *http.Request, registerData *RegisterData, db *sql.DB) {
+func registerUser(r *http.Request, registerData *RegisterData, db *sql.DB) int {
 	err := r.ParseForm()
 	check(err)
 
@@ -147,10 +143,12 @@ func registerUser(r *http.Request, registerData *RegisterData, db *sql.DB) {
 	dbErr := db.QueryRow("INSERT into account (email,password,username) VALUES ($1,$2,$3) returning id;", r.PostFormValue("email"), r.PostFormValue("password"), r.PostFormValue("username")).Scan(&lastInsertId)
 	check(dbErr)
 
-	UserData = User{
-		lastInsertId,
-	}
+	//UserData = User{
+	//	lastInsertId,
+	//}
 	clearRegisterForm(registerData)
+
+	return lastInsertId
 }
 
 func loginUser(db *sql.DB, r *http.Request) (int, error) {
@@ -231,13 +229,13 @@ func check(err error) {
 	}
 }
 
-func todoListHandler(data NotesListData, db *sql.DB) http.Handler {
+func todoListHandler(data NotesListData, db *sql.DB, user *User) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if UserData.id == 0 {
+		if user.id == 0 {
 			http.Redirect(w, r, "/login", http.StatusFound)
 		} else {
-			data.UserId = UserData.id
-			data.TodoList = todoListData(UserData.id, db)
+			data.UserId = user.id
+			data.TodoList = todoListData(user.id, db)
 		}
 
 		renderTemplate(w, "todolist", data)
@@ -256,9 +254,9 @@ func renderTemplate(w http.ResponseWriter, tpl string, data interface{}) {
 	_ = t.Execute(w, data)
 }
 
-func loginHandler(db *sql.DB, loginData *LoginData) http.Handler {
+func loginHandler(db *sql.DB, loginData *LoginData, user *User) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if UserData.id != 0 {
+		if user.id != 0 {
 			http.Redirect(w, r, "/todolist", http.StatusFound)
 		}
 
@@ -274,9 +272,7 @@ func loginHandler(db *sql.DB, loginData *LoginData) http.Handler {
 				}
 				http.Redirect(w, r, "/login", http.StatusFound)
 			} else {
-				UserData = User{
-					id,
-				}
+				user.id = id
 				clearLoginForm(loginData)
 				http.Redirect(w, r, "/todolist", http.StatusFound)
 			}
@@ -284,9 +280,9 @@ func loginHandler(db *sql.DB, loginData *LoginData) http.Handler {
 	})
 }
 
-func addNoteHandler(notes NotesListData, db *sql.DB) http.Handler {
+func addNoteHandler(notes NotesListData, db *sql.DB, user *User) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if UserData.id == 0 {
+		if user.id == 0 {
 			http.Redirect(w, r, "/login", http.StatusFound)
 		}
 
@@ -308,7 +304,7 @@ func addNoteHandler(notes NotesListData, db *sql.DB) http.Handler {
 			}
 
 			var lastInsertId int
-			err = db.QueryRow("INSERT into public.todo_list (user_id,todo,status) VALUES ($1,$2,$3) returning id;", UserData.id, r.PostFormValue("note"), true).Scan(&lastInsertId)
+			err = db.QueryRow("INSERT into public.todo_list (user_id,todo,status) VALUES ($1,$2,$3) returning id;", user.id, r.PostFormValue("note"), true).Scan(&lastInsertId)
 			check(err)
 
 			http.Redirect(w, r, "/todolist", http.StatusFound)
@@ -339,9 +335,9 @@ func closeDb(db *sql.DB) {
 	check(err)
 }
 
-func logoutHandler(ld *LoginData, listData NotesListData, regData *RegisterData) http.Handler {
+func logoutHandler(ld *LoginData, listData NotesListData, regData *RegisterData, user *User) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		UserData.id = 0
+		user.id = 0
 		ld.Error = ""
 		listData.Error = ""
 		regData.Error = RegisterErr{}
@@ -350,7 +346,7 @@ func logoutHandler(ld *LoginData, listData NotesListData, regData *RegisterData)
 	})
 }
 
-func removeTodoHandler(db *sql.DB) http.Handler {
+func removeTodoHandler(db *sql.DB, user *User) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "POST" {
 			err := r.ParseForm()
@@ -359,7 +355,7 @@ func removeTodoHandler(db *sql.DB) http.Handler {
 			if len(r.Form["id"]) == 0 {
 				panic("id not exists")
 			}
-			if UserData.id == 0 {
+			if user.id == 0 {
 				panic("user_id = 0")
 			}
 
@@ -397,6 +393,7 @@ func main() {
 		RegisterErr{},
 		RegisterField{},
 	}
+	user := &User{}
 
 	fs := http.FileServer(http.Dir("./src/github.com/yfedoruck/todolist/static/css"))
 	//http.Handle("/src/todolist/static/css/signin.css", fs)
@@ -404,12 +401,12 @@ func main() {
 
 	//var h Hello
 	http.HandleFunc("/", root)
-	http.Handle("/register", register(&registerData, db))
-	http.Handle("/login", loginHandler(db, &loginData))
-	http.Handle("/todolist", todoListHandler(notesListData, db))
-	http.Handle("/add", addNoteHandler(notesListData, db))
-	http.Handle("/remove", removeTodoHandler(db))
-	http.Handle("/logout", logoutHandler(&loginData, notesListData, &registerData))
+	http.Handle("/register", register(&registerData, db, user))
+	http.Handle("/login", loginHandler(db, &loginData, user))
+	http.Handle("/todolist", todoListHandler(notesListData, db, user))
+	http.Handle("/add", addNoteHandler(notesListData, db, user))
+	http.Handle("/remove", removeTodoHandler(db, user))
+	http.Handle("/logout", logoutHandler(&loginData, notesListData, &registerData, user))
 
 	err = http.ListenAndServe("localhost:4000", nil)
 	if err != nil {
