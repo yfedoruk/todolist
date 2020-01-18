@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	_ "github.com/lib/pq"
-	"github.com/yfedoruck/todolist/middleware"
+	"github.com/yfedoruck/todolist/validate"
 	"html/template"
 	"log"
 	"net/http"
@@ -86,7 +86,7 @@ func register(regData *RegisterData, db *sql.DB, user *User) http.Handler {
 		} else {
 			var validation = true
 
-			errUsername := middleware.Username(r)
+			errUsername := validate.Username(r)
 			if errUsername != nil {
 				regData.Error.Username = errUsername.Error()
 				validation = false
@@ -94,7 +94,7 @@ func register(regData *RegisterData, db *sql.DB, user *User) http.Handler {
 				regData.Error.Username = ""
 			}
 
-			errEmail := middleware.Email(r)
+			errEmail := validate.Email(r)
 			if errEmail != nil {
 				regData.Error.Email = errEmail.Error()
 				validation = false
@@ -291,7 +291,7 @@ func addNoteHandler(notes *NotesListData, db *sql.DB, user *User) http.Handler {
 				panic("note not exists")
 			}
 
-			err = middleware.Note(r)
+			err = validate.Note(r)
 			if err != nil {
 				notes.Error = err.Error()
 				http.Redirect(w, r, "/todolist", http.StatusFound)
