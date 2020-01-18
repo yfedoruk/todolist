@@ -24,8 +24,6 @@ const (
 )
 
 var (
-	db       *sql.DB
-	err      error
 	UserData User
 )
 
@@ -77,7 +75,7 @@ func root(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
-func register(regData *RegisterData) http.Handler {
+func register(regData *RegisterData, db *sql.DB) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		if r.Method == "GET" {
@@ -119,8 +117,8 @@ func register(regData *RegisterData) http.Handler {
 				return
 			}
 
-			isUniqueUsername := isUniqueUsername(r, regData)
-			isUniqueEmail := isUniqueEmail(r, regData)
+			isUniqueUsername := isUniqueUsername(r, regData, db)
+			isUniqueEmail := isUniqueEmail(r, regData, db)
 
 			if !isUniqueUsername || !isUniqueEmail {
 				regData.PreFill = RegisterField{
@@ -135,14 +133,14 @@ func register(regData *RegisterData) http.Handler {
 				regData.Error = RegisterErr{}
 			}
 
-			registerUser(r, regData)
+			registerUser(r, regData, db)
 			http.Redirect(w, r, "/todolist", http.StatusFound)
 		}
 	})
 }
 
-func registerUser(r *http.Request, registerData *RegisterData) {
-	err = r.ParseForm()
+func registerUser(r *http.Request, registerData *RegisterData, db *sql.DB) {
+	err := r.ParseForm()
 	check(err)
 
 	var lastInsertId int
@@ -156,7 +154,7 @@ func registerUser(r *http.Request, registerData *RegisterData) {
 }
 
 func loginUser(db *sql.DB, r *http.Request) (int, error) {
-	err = r.ParseForm()
+	err := r.ParseForm()
 	check(err)
 
 	if r.PostFormValue("username") == "" {
@@ -191,7 +189,7 @@ func clearLoginForm(ld *LoginData) {
 	ld.PreFill = LoginField{}
 }
 
-func isUniqueUsername(r *http.Request, data *RegisterData) bool {
+func isUniqueUsername(r *http.Request, data *RegisterData, db *sql.DB) bool {
 	var result bool
 
 	rows, err := db.Query("SELECT id FROM account WHERE username = $1 limit 1;", r.PostFormValue("username"))
@@ -208,7 +206,7 @@ func isUniqueUsername(r *http.Request, data *RegisterData) bool {
 	return result
 }
 
-func isUniqueEmail(r *http.Request, data *RegisterData) bool {
+func isUniqueEmail(r *http.Request, data *RegisterData, db *sql.DB) bool {
 	var result bool
 
 	//strings.Contains(err, "account_username_key")
@@ -233,13 +231,13 @@ func check(err error) {
 	}
 }
 
-func todoListHandler(data NotesListData) http.Handler {
+func todoListHandler(data NotesListData, db *sql.DB) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if UserData.id == 0 {
 			http.Redirect(w, r, "/login", http.StatusFound)
 		} else {
 			data.UserId = UserData.id
-			data.TodoList = todoListData(UserData.id)
+			data.TodoList = todoListData(UserData.id, db)
 		}
 
 		renderTemplate(w, "todolist", data)
@@ -286,14 +284,14 @@ func loginHandler(db *sql.DB, loginData *LoginData) http.Handler {
 	})
 }
 
-func addNoteHandler(notes NotesListData) http.Handler {
+func addNoteHandler(notes NotesListData, db *sql.DB) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if UserData.id == 0 {
 			http.Redirect(w, r, "/login", http.StatusFound)
 		}
 
 		if r.Method == "POST" {
-			err = r.ParseForm()
+			err := r.ParseForm()
 			check(err)
 
 			if len(r.Form["note"]) == 0 {
@@ -318,7 +316,7 @@ func addNoteHandler(notes NotesListData) http.Handler {
 	})
 }
 
-func todoListData(userId int) []Todo {
+func todoListData(userId int, db *sql.DB) []Todo {
 	rows, err := db.Query("SELECT id, todo, status FROM  public.todo_list where user_id = $1 ORDER BY id DESC", userId)
 	check(err)
 
@@ -336,16 +334,16 @@ func todoListData(userId int) []Todo {
 	return list
 }
 
-func closeDb() {
-	err = db.Close()
+func closeDb(db *sql.DB) {
+	err := db.Close()
 	check(err)
 }
 
 func main() {
 	dbInfo := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=disable", DbUser, DbPassword, DbName)
-	db, err = sql.Open("postgres", dbInfo)
+	db, err := sql.Open("postgres", dbInfo)
 	check(err)
-	defer closeDb()
+	defer closeDb(db)
 
 	var loginData = LoginData{
 		"/css/signin.css",
@@ -373,14 +371,14 @@ func main() {
 
 	//var h Hello
 	http.HandleFunc("/", root)
-	http.Handle("/register", register(&registerData))
+	http.Handle("/register", register(&registerData, db))
 	http.Handle("/login", loginHandler(db, &loginData))
-	http.Handle("/todolist", todoListHandler(notesListData))
-	http.Handle("/add", addNoteHandler(notesListData))
-	http.Handle("/remove", removeTodoHandler())
+	http.Handle("/todolist", todoListHandler(notesListData, db))
+	http.Handle("/add", addNoteHandler(notesListData, db))
+	http.Handle("/remove", removeTodoHandler(db))
 	http.Handle("/logout", logoutHandler(&loginData, notesListData, &registerData))
 
-	err := http.ListenAndServe("localhost:4000", nil)
+	err = http.ListenAndServe("localhost:4000", nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
@@ -397,10 +395,10 @@ func logoutHandler(ld *LoginData, listData NotesListData, regData *RegisterData)
 	})
 }
 
-func removeTodoHandler() http.Handler {
+func removeTodoHandler(db *sql.DB) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "POST" {
-			err = r.ParseForm()
+			err := r.ParseForm()
 			check(err)
 
 			if len(r.Form["id"]) == 0 {
