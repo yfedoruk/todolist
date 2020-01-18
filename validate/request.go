@@ -47,3 +47,13 @@ func Email(r *http.Request) error {
 		return nil
 	}
 }
+
+func Note(r *http.Request) error {
+	const NoteRule = 50
+
+	note := r.FormValue("note")
+	if len(note) > NoteRule {
+		return errors.New("max note length = " + strconv.Itoa(NoteRule))
+	}
+	return nil
+}
