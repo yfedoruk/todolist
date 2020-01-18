@@ -229,7 +229,7 @@ func check(err error) {
 	}
 }
 
-func todoListHandler(data NotesListData, db *sql.DB, user *User) http.Handler {
+func todoListHandler(data *NotesListData, db *sql.DB, user *User) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if user.id == 0 {
 			http.Redirect(w, r, "/login", http.StatusFound)
@@ -280,7 +280,7 @@ func loginHandler(db *sql.DB, loginData *LoginData, user *User) http.Handler {
 	})
 }
 
-func addNoteHandler(notes NotesListData, db *sql.DB, user *User) http.Handler {
+func addNoteHandler(notes *NotesListData, db *sql.DB, user *User) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if user.id == 0 {
 			http.Redirect(w, r, "/login", http.StatusFound)
@@ -335,7 +335,7 @@ func closeDb(db *sql.DB) {
 	check(err)
 }
 
-func logoutHandler(ld *LoginData, listData NotesListData, regData *RegisterData, user *User) http.Handler {
+func logoutHandler(ld *LoginData, listData *NotesListData, regData *RegisterData, user *User) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user.id = 0
 		ld.Error = ""
@@ -374,20 +374,20 @@ func main() {
 	check(err)
 	defer closeDb(db)
 
-	var loginData = LoginData{
+	var loginData = &LoginData{
 		"/css/signin.css",
 		"Sign in",
 		"",
 		LoginField{},
 	}
-	var notesListData = NotesListData{
+	var notesListData = &NotesListData{
 		"/css/signin.css",
 		"Todo list",
 		0,
 		nil,
 		"",
 	}
-	var registerData = RegisterData{
+	var registerData = &RegisterData{
 		"/css/signin.css",
 		"Sign in",
 		RegisterErr{},
@@ -401,12 +401,12 @@ func main() {
 
 	//var h Hello
 	http.HandleFunc("/", root)
-	http.Handle("/register", register(&registerData, db, user))
-	http.Handle("/login", loginHandler(db, &loginData, user))
+	http.Handle("/register", register(registerData, db, user))
+	http.Handle("/login", loginHandler(db, loginData, user))
 	http.Handle("/todolist", todoListHandler(notesListData, db, user))
 	http.Handle("/add", addNoteHandler(notesListData, db, user))
 	http.Handle("/remove", removeTodoHandler(db, user))
-	http.Handle("/logout", logoutHandler(&loginData, notesListData, &registerData, user))
+	http.Handle("/logout", logoutHandler(loginData, notesListData, registerData, user))
 
 	err = http.ListenAndServe("localhost:4000", nil)
 	if err != nil {
