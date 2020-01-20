@@ -2,9 +2,9 @@ package main
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	_ "github.com/lib/pq"
+	"github.com/yfedoruck/todolist/pg"
 	"github.com/yfedoruck/todolist/validate"
 	"html/template"
 	"log"
@@ -20,7 +20,6 @@ const (
 
 	UsernameExists = "username already exists"
 	EmailExists    = "email already exists"
-	LoginFails     = "wrong username or password"
 )
 
 type LoginData struct {
@@ -55,14 +54,10 @@ type NotesListData struct {
 	Css      string
 	Title    string
 	UserId   int
-	TodoList []Todo
+	TodoList []pg.Todo
 	Error    string
 }
-type Todo struct {
-	Id     int
-	Todo   string
-	Status bool
-}
+
 type User struct {
 	id int
 }
@@ -82,7 +77,8 @@ func register(regData *RegisterData, db *sql.DB, user *User) http.Handler {
 			t, err := template.ParseFiles(dir + ViewPath + "register.html")
 			check(err)
 
-			_ = t.Execute(w, regData)
+			err = t.Execute(w, regData)
+			check(err)
 		} else {
 			var validation = true
 
@@ -129,49 +125,11 @@ func register(regData *RegisterData, db *sql.DB, user *User) http.Handler {
 				regData.Error = RegisterErr{}
 			}
 
-			user.id = registerUser(r, regData, db)
+			user.id = pg.RegisterUser(r, db)
+			clearRegisterForm(regData)
 			http.Redirect(w, r, "/todolist", http.StatusFound)
 		}
 	})
-}
-
-func registerUser(r *http.Request, registerData *RegisterData, db *sql.DB) int {
-	err := r.ParseForm()
-	check(err)
-
-	var lastInsertId int
-	dbErr := db.QueryRow("INSERT into account (email,password,username) VALUES ($1,$2,$3) returning id;", r.PostFormValue("email"), r.PostFormValue("password"), r.PostFormValue("username")).Scan(&lastInsertId)
-	check(dbErr)
-
-	clearRegisterForm(registerData)
-
-	return lastInsertId
-}
-
-func loginUser(db *sql.DB, r *http.Request) (int, error) {
-	err := r.ParseForm()
-	check(err)
-
-	if r.PostFormValue("username") == "" {
-		return 0, errors.New("username not exists")
-	}
-
-	if r.PostFormValue("password") == "" {
-		return 0, errors.New("password not exists")
-	}
-
-	rows, err := db.Query("SELECT id, email FROM account WHERE username = $1 and password=$2 limit 1;", r.PostFormValue("username"), r.PostFormValue("password"))
-	check(err)
-
-	if rows.Next() == false {
-		return 0, errors.New(LoginFails)
-	} else {
-		var id int
-		var email string
-		err = rows.Scan(&id, &email)
-		check(err)
-		return id, nil
-	}
 }
 
 func clearRegisterForm(data *RegisterData) {
@@ -185,38 +143,31 @@ func clearLoginForm(ld *LoginData) {
 }
 
 func isUniqueUsername(r *http.Request, data *RegisterData, db *sql.DB) bool {
-	var result bool
 
-	rows, err := db.Query("SELECT id FROM account WHERE username = $1 limit 1;", r.PostFormValue("username"))
-	check(err)
+	username := r.PostFormValue("username")
 
-	if rows.Next() {
-		data.Error.Username = UsernameExists
-		result = false
-	} else {
+	ok := pg.IsUniqueUsername(username, db)
+
+	if ok {
 		data.Error.Username = ""
-		result = true
+	} else {
+		data.Error.Username = UsernameExists
 	}
 
-	return result
+	return ok
 }
 
 func isUniqueEmail(r *http.Request, data *RegisterData, db *sql.DB) bool {
-	var result bool
 
-	//strings.Contains(err, "account_username_key")
-	rows, err := db.Query("SELECT id FROM account WHERE email = $1 limit 1;", r.PostFormValue("email"))
-	check(err)
+	ok := pg.IsUniqueEmail(r.PostFormValue("email"), db)
 
-	if rows.Next() {
-		data.Error.Email = EmailExists
-		result = false
-	} else {
+	if ok {
 		data.Error.Email = ""
-		result = true
+	} else {
+		data.Error.Email = EmailExists
 	}
 
-	return result
+	return ok
 }
 
 func check(err error) {
@@ -232,7 +183,7 @@ func todoListHandler(data *NotesListData, db *sql.DB, user *User) http.Handler {
 			http.Redirect(w, r, "/login", http.StatusFound)
 		} else {
 			data.UserId = user.id
-			data.TodoList = todoListData(user.id, db)
+			data.TodoList = pg.TodoListData(user.id, db)
 		}
 
 		renderTemplate(w, "todolist", data)
@@ -260,7 +211,7 @@ func loginHandler(db *sql.DB, loginData *LoginData, user *User) http.Handler {
 		if r.Method == "GET" {
 			renderTemplate(w, "login", loginData)
 		} else {
-			id, err := loginUser(db, r)
+			id, err := pg.LoginUser(db, r)
 			if err != nil {
 				loginData.Error = err.Error()
 				loginData.PreFill = LoginField{
@@ -300,31 +251,11 @@ func addNoteHandler(notes *NotesListData, db *sql.DB, user *User) http.Handler {
 				notes.Error = ""
 			}
 
-			var lastInsertId int
-			err = db.QueryRow("INSERT into public.todo_list (user_id,todo,status) VALUES ($1,$2,$3) returning id;", user.id, r.PostFormValue("note"), true).Scan(&lastInsertId)
-			check(err)
+			pg.AddNote(r, db, user.id)
 
 			http.Redirect(w, r, "/todolist", http.StatusFound)
 		}
 	})
-}
-
-func todoListData(userId int, db *sql.DB) []Todo {
-	rows, err := db.Query("SELECT id, todo, status FROM  public.todo_list where user_id = $1 ORDER BY id DESC", userId)
-	check(err)
-
-	var id int
-	var todo string
-	var status bool
-	var list []Todo
-	for rows.Next() {
-		err = rows.Scan(&id, &todo, &status)
-		check(err)
-		td := Todo{id, todo, status}
-		list = append(list, td)
-	}
-
-	return list
 }
 
 func closeDb(db *sql.DB) {
@@ -356,10 +287,7 @@ func removeTodoHandler(db *sql.DB, user *User) http.Handler {
 				panic("user_id = 0")
 			}
 
-			stmt, err := db.Prepare("Delete from todo_list where id=$1")
-			check(err)
-			_, err = stmt.Exec(r.PostFormValue("id"))
-			check(err)
+			pg.RemoveNote(r, db)
 			http.Redirect(w, r, "/todolist", http.StatusFound)
 		}
 	})
