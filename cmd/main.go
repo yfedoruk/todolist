@@ -2,8 +2,10 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	_ "github.com/lib/pq"
+	"github.com/yfedoruck/todolist/lang"
 	"github.com/yfedoruck/todolist/pg"
 	"github.com/yfedoruck/todolist/validate"
 	"html/template"
@@ -11,15 +13,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 )
 
 const (
 	DbUser     = "postgres"
 	DbPassword = "1"
 	DbName     = "todolist"
-
-	UsernameExists = "username already exists"
-	EmailExists    = "email already exists"
 )
 
 type LoginData struct {
@@ -82,6 +82,12 @@ func register(regData *RegisterData, db *sql.DB, user *User) http.Handler {
 		} else {
 			var validation = true
 
+			err := r.ParseForm()
+			check(err)
+			username := r.PostFormValue("username")
+			password := r.PostFormValue("password")
+			email := r.PostFormValue("email")
+
 			errUsername := validate.Username(r)
 			if errUsername != nil {
 				regData.Error.Username = errUsername.Error()
@@ -100,9 +106,9 @@ func register(regData *RegisterData, db *sql.DB, user *User) http.Handler {
 
 			if !validation {
 				regData.PreFill = RegisterField{
-					r.PostFormValue("email"),
-					r.PostFormValue("username"),
-					r.PostFormValue("password"),
+					email,
+					username,
+					password,
 				}
 
 				http.Redirect(w, r, "/register", http.StatusFound)
@@ -114,9 +120,9 @@ func register(regData *RegisterData, db *sql.DB, user *User) http.Handler {
 
 			if !isUniqueUsername || !isUniqueEmail {
 				regData.PreFill = RegisterField{
-					r.PostFormValue("email"),
-					r.PostFormValue("username"),
-					r.PostFormValue("password"),
+					email,
+					username,
+					password,
 				}
 				http.Redirect(w, r, "/register", http.StatusFound)
 				return
@@ -125,7 +131,7 @@ func register(regData *RegisterData, db *sql.DB, user *User) http.Handler {
 				regData.Error = RegisterErr{}
 			}
 
-			user.id = pg.RegisterUser(r, db)
+			user.id = pg.RegisterUser(db, email, password, username)
 			clearRegisterForm(regData)
 			http.Redirect(w, r, "/todolist", http.StatusFound)
 		}
@@ -151,7 +157,7 @@ func isUniqueUsername(r *http.Request, data *RegisterData, db *sql.DB) bool {
 	if ok {
 		data.Error.Username = ""
 	} else {
-		data.Error.Username = UsernameExists
+		data.Error.Username = lang.UsernameExists
 	}
 
 	return ok
@@ -164,7 +170,7 @@ func isUniqueEmail(r *http.Request, data *RegisterData, db *sql.DB) bool {
 	if ok {
 		data.Error.Email = ""
 	} else {
-		data.Error.Email = EmailExists
+		data.Error.Email = lang.EmailExists
 	}
 
 	return ok
@@ -211,12 +217,25 @@ func loginHandler(db *sql.DB, loginData *LoginData, user *User) http.Handler {
 		if r.Method == "GET" {
 			renderTemplate(w, "login", loginData)
 		} else {
-			id, err := pg.LoginUser(db, r)
+			err := r.ParseForm()
+			check(err)
+			username := r.PostFormValue("username")
+			password := r.PostFormValue("password")
+
+			if username == "" {
+				err = errors.New(lang.NameEmpty)
+			}
+
+			if password == "" {
+				err = errors.New(lang.PassEmpty)
+			}
+
+			id, err := pg.LoginUser(db, username, password)
 			if err != nil {
 				loginData.Error = err.Error()
 				loginData.PreFill = LoginField{
-					Username: r.PostFormValue("username"),
-					Password: r.PostFormValue("password"),
+					Username: username,
+					Password: password,
 				}
 				http.Redirect(w, r, "/login", http.StatusFound)
 			} else {
@@ -251,7 +270,7 @@ func addNoteHandler(notes *NotesListData, db *sql.DB, user *User) http.Handler {
 				notes.Error = ""
 			}
 
-			pg.AddNote(r, db, user.id)
+			pg.AddNote(db, user.id, r.PostFormValue("note"))
 
 			http.Redirect(w, r, "/todolist", http.StatusFound)
 		}
@@ -287,7 +306,10 @@ func removeTodoHandler(db *sql.DB, user *User) http.Handler {
 				panic("user_id = 0")
 			}
 
-			pg.RemoveNote(r, db)
+			ok, err := strconv.Atoi(r.PostFormValue("id"))
+			check(err)
+
+			pg.RemoveNote(ok, db)
 			http.Redirect(w, r, "/todolist", http.StatusFound)
 		}
 	})

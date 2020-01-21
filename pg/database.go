@@ -3,7 +3,7 @@ package pg
 import (
 	"database/sql"
 	"errors"
-	"net/http"
+	"github.com/yfedoruck/todolist/lang"
 )
 
 type Todo struct {
@@ -18,39 +18,22 @@ func check(err error) {
 	}
 }
 
-func RegisterUser(r *http.Request, db *sql.DB) int {
-	err := r.ParseForm()
-	check(err)
+func RegisterUser(db *sql.DB, username string, password string, email string) int {
 
 	var lastInsertId int
-	dbErr := db.QueryRow("INSERT into account (email,password,username) VALUES ($1,$2,$3) returning id;", r.PostFormValue("email"), r.PostFormValue("password"), r.PostFormValue("username")).Scan(&lastInsertId)
+	dbErr := db.QueryRow("INSERT into account (email,password,username) VALUES ($1,$2,$3) returning id;", email, password, username).Scan(&lastInsertId)
 	check(dbErr)
 
 	return lastInsertId
 }
 
-func LoginUser(db *sql.DB, r *http.Request) (int, error) {
-	const (
-		loginErr = "wrong username or password"
-		nameErr  = "username not exists"
-		passErr  = "password not exists"
-	)
-	err := r.ParseForm()
-	check(err)
+func LoginUser(db *sql.DB, username string, password string) (int, error) {
 
-	if r.PostFormValue("username") == "" {
-		return 0, errors.New(nameErr)
-	}
-
-	if r.PostFormValue("password") == "" {
-		return 0, errors.New(passErr)
-	}
-
-	rows, err := db.Query("SELECT id, email FROM account WHERE username = $1 and password=$2 limit 1;", r.PostFormValue("username"), r.PostFormValue("password"))
+	rows, err := db.Query("SELECT id, email FROM account WHERE username = $1 and password=$2 limit 1;", username, password)
 	check(err)
 
 	if rows.Next() == false {
-		return 0, errors.New(loginErr)
+		return 0, errors.New(lang.LoginErr)
 	} else {
 		var id int
 		var email string
@@ -78,22 +61,17 @@ func TodoListData(userId int, db *sql.DB) []Todo {
 	return list
 }
 
-func AddNote(r *http.Request, db *sql.DB, userId int) {
-	err := r.ParseForm()
-	check(err)
+func AddNote(db *sql.DB, userId int, note string) {
 
 	var lastInsertId int
-	err = db.QueryRow("INSERT into public.todo_list (user_id,todo,status) VALUES ($1,$2,$3) returning id;", userId, r.PostFormValue("note"), true).Scan(&lastInsertId)
+	err := db.QueryRow("INSERT into public.todo_list (user_id,todo,status) VALUES ($1,$2,$3) returning id;", userId, note, true).Scan(&lastInsertId)
 	check(err)
 }
 
-func RemoveNote(r *http.Request, db *sql.DB) {
-	err := r.ParseForm()
-	check(err)
-
+func RemoveNote(id int, db *sql.DB) {
 	stmt, err := db.Prepare("Delete from todo_list where id=$1")
 	check(err)
-	_, err = stmt.Exec(r.PostFormValue("id"))
+	_, err = stmt.Exec(id)
 	check(err)
 }
 
