@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/yfedoruck/todolist/lang"
+	"log"
 )
 
 type Todo struct {
@@ -14,7 +15,7 @@ type Todo struct {
 
 func check(err error) {
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 }
 

@@ -178,8 +178,7 @@ func isUniqueEmail(r *http.Request, data *RegisterData, db *sql.DB) bool {
 
 func check(err error) {
 	if err != nil {
-		fmt.Println(err.Error())
-		panic(err)
+		log.Fatal(err)
 	}
 }
 
