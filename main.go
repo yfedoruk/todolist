@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"errors"
+	"flag"
 	"fmt"
 	_ "github.com/lib/pq"
 	"github.com/yfedoruck/todolist/lang"
@@ -20,6 +21,10 @@ const (
 	DbUser     = "postgres"
 	DbPassword = "1"
 	DbName     = "todolist"
+)
+
+var (
+	httpAddr = flag.String("http", ":8080", "Listen address")
 )
 
 type LoginData struct {
@@ -353,7 +358,7 @@ func main() {
 	http.Handle("/remove", removeTodoHandler(db, user))
 	http.Handle("/logout", logoutHandler(loginData, notesListData, registerData, user))
 
-	err = http.ListenAndServe("localhost:4000", nil)
+	err = http.ListenAndServe(*httpAddr, nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
