@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"errors"
-	"flag"
 	"fmt"
 	_ "github.com/lib/pq"
 	"github.com/yfedoruck/todolist/lang"
@@ -21,10 +20,6 @@ const (
 	DbUser     = "postgres"
 	DbPassword = "1"
 	DbName     = "todolist"
-)
-
-var (
-	httpAddr = flag.String("http", ":8080", "Listen address")
 )
 
 type LoginData struct {
@@ -325,6 +320,8 @@ func main() {
 	check(err)
 	defer closeDb(db)
 
+	tables(db)
+
 	var loginData = &LoginData{
 		"/css/signin.css",
 		"Sign in",
@@ -349,7 +346,6 @@ func main() {
 	fs := http.FileServer(http.Dir("./src/github.com/yfedoruck/todolist/static/css"))
 	http.Handle("/css/", http.StripPrefix("/css/", fs))
 
-	//var h Hello
 	http.HandleFunc("/", root)
 	http.Handle("/register", register(registerData, db, user))
 	http.Handle("/login", loginHandler(db, loginData, user))
@@ -358,7 +354,7 @@ func main() {
 	http.Handle("/remove", removeTodoHandler(db, user))
 	http.Handle("/logout", logoutHandler(loginData, notesListData, registerData, user))
 
-	err = http.ListenAndServe(*httpAddr, nil)
+	err = http.ListenAndServe(":"+port(), nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
