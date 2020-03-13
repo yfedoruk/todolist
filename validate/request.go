@@ -3,8 +3,14 @@ package validate
 import (
 	"errors"
 	"net/http"
+	"regexp"
 	"strconv"
 )
+
+func check(str string, rule string) bool {
+	var rx = regexp.MustCompile(rule)
+	return rx.MatchString(str)
+}
 
 func Username(r *http.Request) error {
 
@@ -19,7 +25,7 @@ func Username(r *http.Request) error {
 	if len(name) > Length {
 		err = "Max username length = " + strconv.Itoa(Length) + ". "
 	}
-	if !Check(name, RegExp) {
+	if !check(name, RegExp) {
 		err = err + "Username must have only digital, alphabetical or underscore symbols. "
 	}
 
@@ -37,7 +43,7 @@ func Email(r *http.Request) error {
 
 	var err string
 
-	if !Check(email, EmailRule) {
+	if !check(email, EmailRule) {
 		err = err + "email is wrong"
 	}
 
