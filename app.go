@@ -2,13 +2,14 @@ package main
 
 import (
 	"log"
+	"os"
 	"path/filepath"
 	"runtime"
 )
 
 var baseDir string
 
-func basePath() string {
+func BasePath() string {
 	if baseDir != "" {
 		return baseDir
 	}
@@ -20,3 +21,12 @@ func basePath() string {
 	baseDir = filepath.Dir(b)
 	return baseDir
 }
+
+func Env() string {
+	domain := os.Getenv("USERDOMAIN")
+	if domain == "home" {
+		return "local"
+	}
+	return "heroku"
+}
+

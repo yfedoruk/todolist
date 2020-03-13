@@ -1,12 +1,9 @@
 package main
 
 import (
-	"database/sql"
 	"errors"
-	"fmt"
 	_ "github.com/lib/pq"
 	"github.com/yfedoruck/todolist/lang"
-	"github.com/yfedoruck/todolist/pg"
 	"github.com/yfedoruck/todolist/validate"
 	"html/template"
 	"log"
@@ -14,12 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-)
-
-const (
-	DbUser     = "postgres"
-	DbPassword = "1"
-	DbName     = "todolist"
 )
 
 type LoginData struct {
@@ -54,7 +45,7 @@ type NotesListData struct {
 	Css      string
 	Title    string
 	UserId   int
-	TodoList []pg.Todo
+	TodoList []Todo
 	Error    string
 }
 
@@ -66,7 +57,7 @@ func root(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
-func register(regData *RegisterData, db *sql.DB, user *User) http.Handler {
+func register(regData *RegisterData, db postgres, user *User) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		if r.Method == "GET" {
@@ -131,7 +122,7 @@ func register(regData *RegisterData, db *sql.DB, user *User) http.Handler {
 				regData.Error = RegisterErr{}
 			}
 
-			user.id = pg.RegisterUser(db, email, password, username)
+			user.id = db.RegisterUser(email, password, username)
 			clearRegisterForm(regData)
 			http.Redirect(w, r, "/todolist", http.StatusFound)
 		}
@@ -148,11 +139,11 @@ func clearLoginForm(ld *LoginData) {
 	ld.PreFill = LoginField{}
 }
 
-func isUniqueUsername(r *http.Request, data *RegisterData, db *sql.DB) bool {
+func isUniqueUsername(r *http.Request, data *RegisterData, db postgres) bool {
 
 	username := r.PostFormValue("username")
 
-	ok := pg.IsUniqueUsername(username, db)
+	ok := db.IsUniqueUsername(username)
 
 	if ok {
 		data.Error.Username = ""
@@ -163,9 +154,9 @@ func isUniqueUsername(r *http.Request, data *RegisterData, db *sql.DB) bool {
 	return ok
 }
 
-func isUniqueEmail(r *http.Request, data *RegisterData, db *sql.DB) bool {
+func isUniqueEmail(r *http.Request, data *RegisterData, db postgres) bool {
 
-	ok := pg.IsUniqueEmail(r.PostFormValue("email"), db)
+	ok := db.IsUniqueEmail(r.PostFormValue("email"))
 
 	if ok {
 		data.Error.Email = ""
@@ -182,13 +173,13 @@ func check(err error) {
 	}
 }
 
-func todoListHandler(data *NotesListData, db *sql.DB, user *User) http.Handler {
+func todoListHandler(data *NotesListData, db postgres, user *User) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if user.id == 0 {
 			http.Redirect(w, r, "/login", http.StatusFound)
 		} else {
 			data.UserId = user.id
-			data.TodoList = pg.TodoListData(user.id, db)
+			data.TodoList = db.TodoListData(user.id)
 		}
 
 		renderTemplate(w, "todolist", data)
@@ -207,7 +198,7 @@ func renderTemplate(w http.ResponseWriter, tpl string, data interface{}) {
 	_ = t.Execute(w, data)
 }
 
-func loginHandler(db *sql.DB, loginData *LoginData, user *User) http.Handler {
+func loginHandler(db postgres, loginData *LoginData, user *User) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if user.id != 0 {
 			http.Redirect(w, r, "/todolist", http.StatusFound)
@@ -229,7 +220,7 @@ func loginHandler(db *sql.DB, loginData *LoginData, user *User) http.Handler {
 				err = errors.New(lang.PassEmpty)
 			}
 
-			id, err := pg.LoginUser(db, username, password)
+			id, err := db.LoginUser(username, password)
 			if err != nil {
 				loginData.Error = err.Error()
 				loginData.PreFill = LoginField{
@@ -246,7 +237,7 @@ func loginHandler(db *sql.DB, loginData *LoginData, user *User) http.Handler {
 	})
 }
 
-func addNoteHandler(notes *NotesListData, db *sql.DB, user *User) http.Handler {
+func addNoteHandler(notes *NotesListData, db postgres, user *User) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if user.id == 0 {
 			http.Redirect(w, r, "/login", http.StatusFound)
@@ -269,16 +260,11 @@ func addNoteHandler(notes *NotesListData, db *sql.DB, user *User) http.Handler {
 				notes.Error = ""
 			}
 
-			pg.AddNote(db, user.id, r.PostFormValue("note"))
+			db.AddNote(user.id, r.PostFormValue("note"))
 
 			http.Redirect(w, r, "/todolist", http.StatusFound)
 		}
 	})
-}
-
-func closeDb(db *sql.DB) {
-	err := db.Close()
-	check(err)
 }
 
 func logoutHandler(ld *LoginData, listData *NotesListData, regData *RegisterData, user *User) http.Handler {
@@ -292,7 +278,7 @@ func logoutHandler(ld *LoginData, listData *NotesListData, regData *RegisterData
 	})
 }
 
-func removeTodoHandler(db *sql.DB, user *User) http.Handler {
+func removeTodoHandler(db postgres, user *User) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "POST" {
 			err := r.ParseForm()
@@ -308,19 +294,22 @@ func removeTodoHandler(db *sql.DB, user *User) http.Handler {
 			ok, err := strconv.Atoi(r.PostFormValue("id"))
 			check(err)
 
-			pg.RemoveNote(ok, db)
+			db.RemoveNote(ok)
 			http.Redirect(w, r, "/todolist", http.StatusFound)
 		}
 	})
 }
 
 func main() {
-	dbInfo := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=disable", DbUser, DbPassword, DbName)
-	db, err := sql.Open("postgres", dbInfo)
-	check(err)
-	defer closeDb(db)
+	db := postgres{}
+	db.Connect()
+	defer db.Close()
+	// defer closeDb(db)
+	// dbInfo := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=disable", DbUser, DbPassword, DbName)
+	// db, err := sql.Open("postgres", dbInfo)
+	// check(err)
 
-	tables(db)
+	db.Tables()
 
 	var loginData = &LoginData{
 		"/css/signin.css",
@@ -354,7 +343,7 @@ func main() {
 	http.Handle("/remove", removeTodoHandler(db, user))
 	http.Handle("/logout", logoutHandler(loginData, notesListData, registerData, user))
 
-	err = http.ListenAndServe(":"+port(), nil)
+	err := http.ListenAndServe(":"+port(), nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}

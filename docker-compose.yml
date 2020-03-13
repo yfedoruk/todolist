@@ -15,10 +15,10 @@ services:
   pg:
     image: postgres:latest
     container_name: clair_postgres
-    environment:
-      POSTGRES_PASSWORD: 1
-    ports:
-      - "5432:5432"
+#    environment:
+#      POSTGRES_PASSWORD: 1
+#    ports:
+#      - "5432:5432"
 #    volumes:
 #      - db-data:/var/lib/postgresql/data
 #volumes:
