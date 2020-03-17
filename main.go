@@ -48,10 +48,6 @@ type NotesListData struct {
 	Error    string
 }
 
-// type User struct {
-// 	id int
-// }
-
 func root(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusFound)
 }
@@ -119,7 +115,6 @@ func register(regData *RegisterData, db postgres) http.Handler {
 			}
 
 			id := db.RegisterUser(password, username, email)
-			// user.id = id
 
 			cookie{
 				Name: username,
@@ -202,9 +197,6 @@ func renderTemplate(w http.ResponseWriter, tpl string, data interface{}) {
 
 func loginHandler(db postgres, loginData *LoginData) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// if user.id != 0 {
-		// 	http.Redirect(w, r, "/todolist", http.StatusFound)
-		// }
 		if _, err := r.Cookie("auth"); err == nil {
 			http.Redirect(w, r, "/todolist", http.StatusFound)
 			return
@@ -239,7 +231,6 @@ func loginHandler(db postgres, loginData *LoginData) http.Handler {
 					Name: username,
 					Id:   id,
 				}.set(w)
-				// user.id = id
 				clearLoginForm(loginData)
 				http.Redirect(w, r, "/todolist", http.StatusFound)
 			}
@@ -249,9 +240,6 @@ func loginHandler(db postgres, loginData *LoginData) http.Handler {
 
 func addNoteHandler(notes *NotesListData, db postgres) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// if user.id == 0 {
-		// 	http.Redirect(w, r, "/login", http.StatusFound)
-		// }
 		auth, err := r.Cookie("auth")
 		if err != nil {
 			http.Redirect(w, r, "/login", http.StatusFound)
@@ -286,7 +274,6 @@ func addNoteHandler(notes *NotesListData, db postgres) http.Handler {
 
 func logoutHandler(ld *LoginData, listData *NotesListData, regData *RegisterData) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// user.id = 0
 		ld.Error = ""
 		listData.Error = ""
 		regData.Error = RegisterErr{}
@@ -311,9 +298,6 @@ func removeTodoHandler(db postgres) http.Handler {
 				http.Redirect(w, r, "/login", http.StatusFound)
 				return
 			}
-			// if user.id == 0 {
-			// 	panic("user_id = 0")
-			// }
 
 			ok, err := strconv.Atoi(r.PostFormValue("id"))
 			check(err)
@@ -328,11 +312,6 @@ func main() {
 	db := postgres{}
 	db.Connect()
 	defer db.Close()
-	// defer closeDb(db)
-	// dbInfo := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=disable", DbUser, DbPassword, DbName)
-	// db, err := sql.Open("postgres", dbInfo)
-	// check(err)
-
 	db.Tables()
 
 	var loginData = &LoginData{
@@ -354,7 +333,6 @@ func main() {
 		RegisterErr{},
 		RegisterField{},
 	}
-	// user := &User{}
 
 	cssDir := BasePath() + filepath.FromSlash("/static/css")
 	fs := http.FileServer(http.Dir(cssDir))
