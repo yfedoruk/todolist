@@ -8,7 +8,6 @@ import (
 	"html/template"
 	"log"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strconv"
 )
@@ -49,23 +48,20 @@ type NotesListData struct {
 	Error    string
 }
 
-type User struct {
-	id int
-}
+// type User struct {
+// 	id int
+// }
 
 func root(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
-func register(regData *RegisterData, db postgres, user *User) http.Handler {
+func register(regData *RegisterData, db postgres) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		if r.Method == "GET" {
-			dir, err := os.Getwd()
-			check(err)
-
-			ViewPath := filepath.FromSlash("/src/github.com/yfedoruck/todolist/views/")
-			t, err := template.ParseFiles(dir + ViewPath + "register.html")
+			viewDir := BasePath() + filepath.FromSlash("/views/")
+			t, err := template.ParseFiles(viewDir + "register.html")
 			check(err)
 
 			err = t.Execute(w, regData)
@@ -122,7 +118,14 @@ func register(regData *RegisterData, db postgres, user *User) http.Handler {
 				regData.Error = RegisterErr{}
 			}
 
-			user.id = db.RegisterUser(email, password, username)
+			id := db.RegisterUser(password, username, email)
+			// user.id = id
+
+			cookie{
+				Name: username,
+				Id:   id,
+			}.set(w)
+
 			clearRegisterForm(regData)
 			http.Redirect(w, r, "/todolist", http.StatusFound)
 		}
@@ -173,35 +176,38 @@ func check(err error) {
 	}
 }
 
-func todoListHandler(data *NotesListData, db postgres, user *User) http.Handler {
+func todoListHandler(data *NotesListData, db postgres) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if user.id == 0 {
+		auth, err := r.Cookie("auth")
+		if err != nil {
 			http.Redirect(w, r, "/login", http.StatusFound)
-		} else {
-			data.UserId = user.id
-			data.TodoList = db.TodoListData(user.id)
+			return
 		}
-
+		user := cookie{}
+		user.decode(auth.Value)
+		data.UserId = user.Id
+		data.TodoList = db.TodoListData(user.Id)
 		renderTemplate(w, "todolist", data)
 	})
 }
 
 func renderTemplate(w http.ResponseWriter, tpl string, data interface{}) {
-	dir, err := os.Getwd()
-	check(err)
+	viewDir := BasePath() + filepath.FromSlash("/views/")
 
-	ViewPath := filepath.FromSlash("/src/github.com/yfedoruck/todolist/views/")
-
-	t, err := template.ParseFiles(dir + ViewPath + tpl + ".html")
+	t, err := template.ParseFiles(viewDir + tpl + ".html")
 	check(err)
 
 	_ = t.Execute(w, data)
 }
 
-func loginHandler(db postgres, loginData *LoginData, user *User) http.Handler {
+func loginHandler(db postgres, loginData *LoginData) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if user.id != 0 {
+		// if user.id != 0 {
+		// 	http.Redirect(w, r, "/todolist", http.StatusFound)
+		// }
+		if _, err := r.Cookie("auth"); err == nil {
 			http.Redirect(w, r, "/todolist", http.StatusFound)
+			return
 		}
 
 		if r.Method == "GET" {
@@ -229,7 +235,11 @@ func loginHandler(db postgres, loginData *LoginData, user *User) http.Handler {
 				}
 				http.Redirect(w, r, "/login", http.StatusFound)
 			} else {
-				user.id = id
+				cookie{
+					Name: username,
+					Id:   id,
+				}.set(w)
+				// user.id = id
 				clearLoginForm(loginData)
 				http.Redirect(w, r, "/todolist", http.StatusFound)
 			}
@@ -237,10 +247,15 @@ func loginHandler(db postgres, loginData *LoginData, user *User) http.Handler {
 	})
 }
 
-func addNoteHandler(notes *NotesListData, db postgres, user *User) http.Handler {
+func addNoteHandler(notes *NotesListData, db postgres) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if user.id == 0 {
+		// if user.id == 0 {
+		// 	http.Redirect(w, r, "/login", http.StatusFound)
+		// }
+		auth, err := r.Cookie("auth")
+		if err != nil {
 			http.Redirect(w, r, "/login", http.StatusFound)
+			return
 		}
 
 		if r.Method == "POST" {
@@ -260,25 +275,28 @@ func addNoteHandler(notes *NotesListData, db postgres, user *User) http.Handler 
 				notes.Error = ""
 			}
 
-			db.AddNote(user.id, r.PostFormValue("note"))
+			user := cookie{}
+			user.decode(auth.Value)
+			db.AddNote(user.Id, r.PostFormValue("note"))
 
 			http.Redirect(w, r, "/todolist", http.StatusFound)
 		}
 	})
 }
 
-func logoutHandler(ld *LoginData, listData *NotesListData, regData *RegisterData, user *User) http.Handler {
+func logoutHandler(ld *LoginData, listData *NotesListData, regData *RegisterData) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		user.id = 0
+		// user.id = 0
 		ld.Error = ""
 		listData.Error = ""
 		regData.Error = RegisterErr{}
 		regData.PreFill = RegisterField{}
+		removeCookie(w)
 		http.Redirect(w, r, "/login", http.StatusFound)
 	})
 }
 
-func removeTodoHandler(db postgres, user *User) http.Handler {
+func removeTodoHandler(db postgres) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "POST" {
 			err := r.ParseForm()
@@ -287,9 +305,15 @@ func removeTodoHandler(db postgres, user *User) http.Handler {
 			if len(r.Form["id"]) == 0 {
 				panic("id not exists")
 			}
-			if user.id == 0 {
-				panic("user_id = 0")
+
+			if _, err := r.Cookie("auth"); err != nil {
+				log.Println("user id not found")
+				http.Redirect(w, r, "/login", http.StatusFound)
+				return
 			}
+			// if user.id == 0 {
+			// 	panic("user_id = 0")
+			// }
 
 			ok, err := strconv.Atoi(r.PostFormValue("id"))
 			check(err)
@@ -330,18 +354,19 @@ func main() {
 		RegisterErr{},
 		RegisterField{},
 	}
-	user := &User{}
+	// user := &User{}
 
-	fs := http.FileServer(http.Dir("./src/github.com/yfedoruck/todolist/static/css"))
+	cssDir := BasePath() + filepath.FromSlash("/static/css")
+	fs := http.FileServer(http.Dir(cssDir))
 	http.Handle("/css/", http.StripPrefix("/css/", fs))
 
 	http.HandleFunc("/", root)
-	http.Handle("/register", register(registerData, db, user))
-	http.Handle("/login", loginHandler(db, loginData, user))
-	http.Handle("/todolist", todoListHandler(notesListData, db, user))
-	http.Handle("/add", addNoteHandler(notesListData, db, user))
-	http.Handle("/remove", removeTodoHandler(db, user))
-	http.Handle("/logout", logoutHandler(loginData, notesListData, registerData, user))
+	http.Handle("/register", register(registerData, db))
+	http.Handle("/login", loginHandler(db, loginData))
+	http.Handle("/todolist", todoListHandler(notesListData, db))
+	http.Handle("/add", addNoteHandler(notesListData, db))
+	http.Handle("/remove", removeTodoHandler(db))
+	http.Handle("/logout", logoutHandler(loginData, notesListData, registerData))
 
 	err := http.ListenAndServe(":"+port(), nil)
 	if err != nil {
