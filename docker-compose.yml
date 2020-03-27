@@ -10,16 +10,16 @@ services:
       - USERDOMAIN=${USERDOMAIN}
     depends_on:
       - pg
-#    ports:
-#      - "8080:5000"
+    ports:
+      - "8080:5000"
   pg:
     image: postgres:latest
     container_name: clair_postgres
     environment:
       POSTGRES_PASSWORD: 1
-#    ports:
-#      - "5432:5432"
-#    volumes:
-#      - db-data:/var/lib/postgresql/data
-#volumes:
-#  db-data:
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+volumes:
+  db-data:
