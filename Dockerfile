@@ -3,15 +3,14 @@
 FROM golang
 
 # Copy the local package files to the container's workspace.
-ADD . /go/src/github.com/yfedoruck/todolist
+WORKDIR /go/src/todolist
+COPY . .
 
-# Build the outyet command inside the container.
-# (You may fetch or manage dependencies here,
-# either manually or with a tool like "godep".)
-RUN go get -u github.com/lib/pq
+RUN bash get.sh
+
+#RUN go get -u github.com/lib/pq
 RUN go install github.com/yfedoruck/todolist
 
-# Run the outyet command by default when the container starts.
 ENTRYPOINT /go/bin/todolist
 
 # Document that the service listens on port 8080.
