@@ -1,17 +1,26 @@
 # Start from a Debian image with the latest version of Go installed
 # and a workspace (GOPATH) configured at /go.
-FROM golang
+FROM golang:1.13.9-alpine3.11 AS builder
+#FROM golang:1.9.4-alpine3.7 AS builder
 
 # Copy the local package files to the container's workspace.
 WORKDIR /go/src/todolist
 COPY . .
 
+RUN apk add --no-cache curl \
+    bash \
+    git
+
 RUN bash get.sh
 
-#RUN go get -u github.com/lib/pq
-RUN go install github.com/yfedoruck/todolist
+RUN CGO_ENABLED=0 GOOS=linux go build -o bin/todolist
 
-ENTRYPOINT /go/bin/todolist
+FROM alpine:3.11
+RUN apk add --no-cache ca-certificates
+COPY --from=builder /go/src/todolist /go/src/todolist
+COPY --from=builder /go/src/todolist/bin/todolist /go/bin/todolist
+
+CMD ["/go/bin/todolist"]
 
 # Document that the service listens on port 8080.
 EXPOSE 8080
