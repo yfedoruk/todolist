@@ -10,7 +10,7 @@ services:
     ports:
       - "8080:5000"
   pg:
-    image: postgres:latest
+    image: postgres:alpine
     container_name: clair_postgres
     environment:
       POSTGRES_PASSWORD: 1
