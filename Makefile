@@ -7,6 +7,11 @@ dev:
 build:
 	docker exec todolist_server_1 go install && \
 	docker-compose.exe restart server
+deb:
+	@docker-compose down && \
+			docker-compose \
+				-f docker-compose.debug.yml \
+				up -d --remove-orphans --build
 heroku:
 	heroku container:login && \
 	heroku container:push --app nameless-brook-78889 web && \
