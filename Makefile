@@ -10,6 +10,7 @@ build:
 deb:
 	@docker-compose down && \
 			docker-compose \
+				-f docker-compose.yml \
 				-f docker-compose.debug.yml \
 				up -d --remove-orphans --build
 heroku:
