@@ -1,9 +1,9 @@
 version: "3"
 services:
   server:
-    build: .
+    build:
+      context: .
     environment:
-      - DEBUG=True
       - USERDOMAIN=${USERDOMAIN}
     depends_on:
       - pg
