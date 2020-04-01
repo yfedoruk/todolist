@@ -3,19 +3,18 @@
  # //or
  # docker exec todolist_server_1 go install &&  docker-compose.exe restart server
 
-
-
 # Start from a Debian image with the latest version of Go installed
 # and a workspace (GOPATH) configured at /go.
 FROM golang:alpine
 
 # Copy the local package files to the container's workspace.
 WORKDIR /go/src/todolist
+
+COPY go.mod go.sum ./
+RUN go mod download
+
 COPY . .
 
-#RUN bash get.sh
-
-RUN go get -u github.com/lib/pq
 RUN go install github.com/yfedoruck/todolist
 
 ENTRYPOINT /go/bin/todolist

@@ -3,7 +3,7 @@ dev:
 		docker-compose \
 			-f docker-compose.yml \
 			-f docker-compose.dev.yml \
-			up -d --remove-orphans
+			up -d --remove-orphans --build
 build:
 	docker exec todolist_server_1 go install && \
 	docker-compose.exe restart server
