@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yfedoruck/todolist/lang"
+	"github.com/yfedoruck/todolist/pkg/lang"
 	"io/ioutil"
 	"log"
 	"os"
@@ -58,6 +58,7 @@ func (p *postgres) Tables() {
 		check(err)
 	}
 }
+
 type Todo struct {
 	Id     int
 	Todo   string
@@ -137,7 +138,6 @@ func (p postgres) IsUniqueEmail(email string) bool {
 
 	return rows.Next() == false
 }
-
 
 type Conf struct {
 	User     string `json:"User"`

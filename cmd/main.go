@@ -3,8 +3,8 @@ package main
 import (
 	"errors"
 	_ "github.com/lib/pq"
-	"github.com/yfedoruck/todolist/lang"
-	"github.com/yfedoruck/todolist/validate"
+	"github.com/yfedoruck/todolist/pkg/lang"
+	"github.com/yfedoruck/todolist/pkg/validate"
 	"html/template"
 	"log"
 	"net/http"
@@ -309,6 +309,7 @@ func removeTodoHandler(db postgres) http.Handler {
 }
 
 func main() {
+	log.Println("45454545545vvvvvv33333dcdcdcdcdc")
 	db := postgres{}
 	db.Connect()
 	defer db.Close()

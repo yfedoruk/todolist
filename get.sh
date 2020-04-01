@@ -1,1 +1,0 @@
-go get -u github.com/lib/pq

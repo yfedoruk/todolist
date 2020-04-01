@@ -15,7 +15,7 @@ RUN go mod download
 
 COPY . .
 
-RUN go install github.com/yfedoruck/todolist
+RUN go build -o /go/bin/todolist github.com/yfedoruck/todolist/cmd
 
 ENTRYPOINT /go/bin/todolist
 

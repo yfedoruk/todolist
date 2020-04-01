@@ -5,7 +5,7 @@ dev:
 			-f docker-compose.dev.yml \
 			up -d --remove-orphans --build
 build:
-	docker exec todolist_server_1 go install && \
+	docker exec todolist_server_1 go build -o /go/bin/todolist github.com/yfedoruck/todolist/cmd && \
 	docker-compose.exe restart server
 deb:
 	@docker-compose down && \
