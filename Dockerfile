@@ -11,7 +11,8 @@ RUN apk add --no-cache curl \
     bash \
     git
 
-RUN bash get.sh
+COPY go.mod go.sum ./
+RUN go mod download
 
 #note: /go/src/todolist/bin/todolist is bad place, because of binded docker-compose volumes not have compiled binary
 RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/todolist
