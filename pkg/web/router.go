@@ -13,7 +13,7 @@ type Router struct {
 func (r Router) New() {
 	db := pg.Postgres{}
 	db.Connect()
-	//defer db.Close()
+	defer db.Close()
 	db.Tables()
 
 	var loginData = &LoginData{
