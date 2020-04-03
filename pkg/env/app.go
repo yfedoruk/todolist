@@ -1,4 +1,4 @@
-package main
+package env
 
 import (
 	"os"
@@ -15,10 +15,20 @@ func BasePath() string {
 	return baseDir
 }
 
-func Env() string {
+func Domain() string {
 	domain := os.Getenv("USERDOMAIN")
 	if domain == "home" {
 		return "local"
 	}
 	return "heroku"
 }
+
+func Port() string {
+	p := os.Getenv("PORT")
+	if p == "" {
+		p = "5000"
+	}
+	return p
+}
+
+

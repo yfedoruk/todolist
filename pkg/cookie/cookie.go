@@ -1,32 +1,33 @@
-package main
+package cookie
 
 import (
 	"encoding/base64"
 	"encoding/json"
+	"github.com/yfedoruck/todolist/pkg/resp"
 	"net/http"
 )
 
-type cookie struct {
+type Cookie struct {
 	Name string
 	Id   int
 }
 
-func (c cookie) encode() string {
+func (c Cookie) encode() string {
 	js, err := json.Marshal(c)
-	check(err)
+	resp.Check(err)
 
 	return base64.StdEncoding.EncodeToString(js)
 }
 
-func (c *cookie) decode(arg string) {
+func (c *Cookie) Decode(arg string) {
 	js, err := base64.StdEncoding.DecodeString(arg)
-	check(err)
+	resp.Check(err)
 
 	err = json.Unmarshal(js, &c)
-	check(err)
+	resp.Check(err)
 }
 
-func (c cookie) set(w http.ResponseWriter) {
+func (c Cookie) Set(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name:  "auth",
 		Value: c.encode(),
@@ -34,7 +35,7 @@ func (c cookie) set(w http.ResponseWriter) {
 	})
 }
 
-func removeCookie(w http.ResponseWriter) {
+func RemoveCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name:   "auth",
 		Value:  "",

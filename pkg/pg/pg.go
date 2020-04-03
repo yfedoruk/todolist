@@ -1,11 +1,13 @@
-package main
+package pg
 
 import (
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yfedoruck/todolist/pkg/env"
 	"github.com/yfedoruck/todolist/pkg/lang"
+	"github.com/yfedoruck/todolist/pkg/resp"
 	"io/ioutil"
 	"log"
 	"os"
@@ -13,17 +15,17 @@ import (
 	"time"
 )
 
-type postgres struct {
+type Postgres struct {
 	db *sql.DB
 }
 
-func (p *postgres) Connect() {
+func (p *Postgres) Connect() {
 	dbConf := Config()
 	dbInfo := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", dbConf.Host, dbConf.Port, dbConf.User, dbConf.Password, dbConf.Name)
 	fmt.Println(dbInfo)
 	var err error
 	p.db, err = sql.Open("postgres", dbInfo)
-	check(err)
+	resp.Check(err)
 
 	for i, connected := 0, false; connected == false && i < 4; i++ {
 		err = p.db.Ping()
@@ -38,24 +40,24 @@ func (p *postgres) Connect() {
 	panic(err)
 }
 
-func (p *postgres) Close() {
+func (p *Postgres) Close() {
 	err := p.db.Close()
-	check(err)
+	resp.Check(err)
 }
 
-func (p *postgres) Tables() {
-	files, err := filepath.Glob(BasePath() + "/sql/*.sql")
-	check(err)
+func (p *Postgres) Tables() {
+	files, err := filepath.Glob(env.BasePath() + "/sql/*.sql")
+	resp.Check(err)
 
 	for _, file := range files {
 		data, err := ioutil.ReadFile(file)
-		check(err)
+		resp.Check(err)
 
 		stmt, err := p.db.Prepare(string(data))
-		check(err)
+		resp.Check(err)
 
 		_, err = stmt.Exec()
-		check(err)
+		resp.Check(err)
 	}
 }
 
@@ -65,19 +67,19 @@ type Todo struct {
 	Status bool
 }
 
-func (p *postgres) RegisterUser(username string, password string, email string) int {
+func (p *Postgres) RegisterUser(username string, password string, email string) int {
 
 	var lastInsertId int
-	dbErr := p.db.QueryRow("INSERT into account (email,password,username) VALUES ($1,$2,$3) returning id;", email, password, username).Scan(&lastInsertId)
-	check(dbErr)
+	err := p.db.QueryRow("INSERT into account (email,password,username) VALUES ($1,$2,$3) returning id;", email, password, username).Scan(&lastInsertId)
+	resp.Check(err)
 
 	return lastInsertId
 }
 
-func (p *postgres) LoginUser(username string, password string) (int, error) {
+func (p *Postgres) LoginUser(username string, password string) (int, error) {
 
 	rows, err := p.db.Query("SELECT id, email FROM account WHERE username = $1 and password=$2 limit 1;", username, password)
-	check(err)
+	resp.Check(err)
 
 	if rows.Next() == false {
 		return 0, errors.New(lang.LoginErr)
@@ -85,14 +87,14 @@ func (p *postgres) LoginUser(username string, password string) (int, error) {
 		var id int
 		var email string
 		err = rows.Scan(&id, &email)
-		check(err)
+		resp.Check(err)
 		return id, nil
 	}
 }
 
-func (p postgres) TodoListData(userId int) []Todo {
+func (p Postgres) TodoListData(userId int) []Todo {
 	rows, err := p.db.Query("SELECT id, todo, status FROM  public.todo_list where user_id = $1 ORDER BY id DESC", userId)
-	check(err)
+	resp.Check(err)
 
 	var id int
 	var todo string
@@ -100,7 +102,7 @@ func (p postgres) TodoListData(userId int) []Todo {
 	var list []Todo
 	for rows.Next() {
 		err = rows.Scan(&id, &todo, &status)
-		check(err)
+		resp.Check(err)
 		td := Todo{id, todo, status}
 		list = append(list, td)
 	}
@@ -108,33 +110,33 @@ func (p postgres) TodoListData(userId int) []Todo {
 	return list
 }
 
-func (p *postgres) AddNote(userId int, note string) {
+func (p *Postgres) AddNote(userId int, note string) {
 
 	var lastInsertId int
 	err := p.db.QueryRow("INSERT into public.todo_list (user_id,todo,status) VALUES ($1,$2,$3) returning id;", userId, note, true).Scan(&lastInsertId)
-	check(err)
+	resp.Check(err)
 }
 
-func (p *postgres) RemoveNote(id int) {
+func (p *Postgres) RemoveNote(id int) {
 	stmt, err := p.db.Prepare("Delete from todo_list where id=$1")
-	check(err)
+	resp.Check(err)
 	_, err = stmt.Exec(id)
-	check(err)
+	resp.Check(err)
 }
 
-func (p postgres) IsUniqueUsername(username string) bool {
+func (p Postgres) IsUniqueUsername(username string) bool {
 
 	// strings.Contains(err, "account_username_key")
 	rows, err := p.db.Query("SELECT id FROM account WHERE username = $1 limit 1;", username)
-	check(err)
+	resp.Check(err)
 
 	return rows.Next() == false
 }
 
-func (p postgres) IsUniqueEmail(email string) bool {
+func (p Postgres) IsUniqueEmail(email string) bool {
 
 	rows, err := p.db.Query("SELECT id FROM account WHERE email = $1 limit 1;", email)
-	check(err)
+	resp.Check(err)
 
 	return rows.Next() == false
 }
@@ -148,12 +150,12 @@ type Conf struct {
 }
 
 func Config() Conf {
-	file, err := os.Open(BasePath() + filepath.FromSlash("/config/"+Env()+"/postgres.json"))
-	check(err)
+	file, err := os.Open(env.BasePath() + filepath.FromSlash("/config/"+env.Domain()+"/postgres.json"))
+	resp.Check(err)
 
 	dbConf := Conf{}
 	err = json.NewDecoder(file).Decode(&dbConf)
-	check(err)
+	resp.Check(err)
 
 	return dbConf
 }
