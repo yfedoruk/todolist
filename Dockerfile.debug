@@ -5,22 +5,17 @@ RUN apk add --no-cache git
 
 ENV CGO_ENABLED 0
 # Copy the local package files to the container's workspace.
-ADD . /go/src/github.com/yfedoruck/todolist
+WORKDIR /go/src/todolist
 
-RUN go get -u github.com/lib/pq
+COPY go.mod go.sum ./
+RUN go mod download
 
-RUN go build -gcflags "all=-N -l" -o /server /go/src/github.com/yfedoruck/todolist
+COPY . .
+
+RUN go build -gcflags "all=-N -l" -o /server github.com/yfedoruck/todolist/cmd/todolist
 
 # Compile Delve
-RUN go get github.com/derekparker/delve/cmd/dlv
-
-# Build the outyet command inside the container.
-# (You may fetch or manage dependencies here,
-# either manually or with a tool like "godep".)
-#RUN go install github.com/yfedoruck/todolist
-
-# Run the outyet command by default when the container starts.
-#ENTRYPOINT /go/bin/todolist
+RUN go get github.com/go-delve/delve/cmd/dlv
 
 # Final stage
 FROM alpine:3.7

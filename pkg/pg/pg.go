@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	_ "github.com/lib/pq"
 	"github.com/yfedoruck/todolist/pkg/env"
 	"github.com/yfedoruck/todolist/pkg/lang"
 	"github.com/yfedoruck/todolist/pkg/resp"
