@@ -5,5 +5,6 @@ services:
       dockerfile: ./Dockerfile.dev
     environment:
       - DEBUG=True
+    container_name: webserver
     volumes:
       - .:/go/src/todolist
