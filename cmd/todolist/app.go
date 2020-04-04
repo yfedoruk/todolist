@@ -19,7 +19,6 @@ func (a *App) Init() {
 }
 
 func (a *App) Run() {
-	a.db.Connect()
 	defer a.db.Close()
 	a.db.Tables()
 	a.server.Start()
