@@ -12,7 +12,7 @@ RUN go mod download
 
 COPY . .
 
-RUN go build -gcflags "all=-N -l" -o /server github.com/yfedoruck/todolist/cmd/todolist
+RUN go build -gcflags "all=-N -l" -o /webserver github.com/yfedoruck/todolist/cmd/todolist
 
 # Compile Delve
 RUN go get github.com/go-delve/delve/cmd/dlv
@@ -26,8 +26,8 @@ EXPOSE 8080 40000
 RUN apk add --no-cache libc6-compat
 
 WORKDIR /
-COPY --from=build-env /server /
+COPY --from=build-env /webserver /
 COPY --from=build-env /go/bin/dlv /
 
 # Run delve
-CMD ["/dlv", "--listen=:40000", "--headless=true", "--api-version=2", "exec", "/server"]
+CMD ["/dlv", "--listen=:40000", "--headless=true", "--api-version=2", "exec", "/webserver"]

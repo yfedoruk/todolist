@@ -10,7 +10,7 @@ import (
 )
 
 type loginHandler struct {
-	db   pg.Postgres
+	db   *pg.Postgres
 	data *LoginData
 }
 

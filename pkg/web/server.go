@@ -2,6 +2,7 @@ package web
 
 import (
 	"github.com/yfedoruck/todolist/pkg/env"
+	"github.com/yfedoruck/todolist/pkg/pg"
 	"log"
 	"net/http"
 )
@@ -17,10 +18,10 @@ func (s *Server) Start() {
 	}
 }
 
-func NewServer() *Server {
+func NewServer(db *pg.Postgres) *Server {
 	s := &Server{}
 	s.Port = env.Port()
-	Router{}.New()
+	Router{}.New(db)
 
 	return s
 }

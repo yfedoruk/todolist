@@ -8,7 +8,7 @@ import (
 	"strconv"
 )
 
-func removeTodoHandler(db pg.Postgres) http.Handler {
+func removeTodoHandler(db *pg.Postgres) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "POST" {
 			err := r.ParseForm()

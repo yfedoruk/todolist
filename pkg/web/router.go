@@ -10,11 +10,7 @@ import (
 type Router struct {
 }
 
-func (r Router) New() {
-	db := pg.Postgres{}
-	db.Connect()
-	defer db.Close()
-	db.Tables()
+func (r Router) New(db *pg.Postgres) {
 
 	var loginData = &LoginData{
 		"/css/signin.css",
@@ -42,7 +38,7 @@ func (r Router) New() {
 
 	http.HandleFunc("/", root)
 
-	http.Handle("/register", &registerHandler{&db, registerData})
+	http.Handle("/register", &registerHandler{db, registerData})
 	http.Handle("/login", &loginHandler{db, loginData})
 	http.Handle("/todolist", todoListHandler(notesListData, db))
 	http.Handle("/add", addNoteHandler(notesListData, db))

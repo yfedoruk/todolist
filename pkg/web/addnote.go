@@ -8,7 +8,7 @@ import (
 	"net/http"
 )
 
-func addNoteHandler(notes *NotesListData, db pg.Postgres) http.Handler {
+func addNoteHandler(notes *NotesListData, db *pg.Postgres) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		auth, err := r.Cookie("auth")
 		if err != nil {

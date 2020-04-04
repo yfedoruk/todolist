@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-func todoListHandler(data *NotesListData, db pg.Postgres) http.Handler {
+func todoListHandler(data *NotesListData, db *pg.Postgres) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		auth, err := r.Cookie("auth")
 		if err != nil {

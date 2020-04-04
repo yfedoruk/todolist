@@ -7,7 +7,7 @@ services:
       - seccomp:unconfined
     cap_add:
       - SYS_PTRACE
-    container_name: server
+    container_name: webserver
     environment:
       - DEBUG=True
     ports:

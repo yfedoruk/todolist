@@ -1,6 +1,7 @@
 package env
 
 import (
+	"github.com/yfedoruck/todolist/pkg/resp"
 	"os"
 )
 
@@ -11,7 +12,9 @@ func BasePath() string {
 		return baseDir
 	}
 
-	baseDir, _ := os.Getwd()
+	baseDir, err := os.Getwd()
+	resp.Check(err)
+
 	return baseDir
 }
 
@@ -30,5 +33,3 @@ func Port() string {
 	}
 	return p
 }
-
-
