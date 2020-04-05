@@ -3,6 +3,7 @@ package web
 import (
 	"errors"
 	"github.com/yfedoruck/todolist/pkg/cookie"
+	"github.com/yfedoruck/todolist/pkg/crypto"
 	"github.com/yfedoruck/todolist/pkg/lang"
 	"github.com/yfedoruck/todolist/pkg/pg"
 	"github.com/yfedoruck/todolist/pkg/resp"
@@ -48,7 +49,7 @@ func (l *loginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			err = errors.New(lang.PassEmpty)
 		}
 
-		id, err := l.db.LoginUser(username, password)
+		id, encryptedPwd, err := l.db.LoginUser(username)
 		if err != nil {
 			l.data.Error = err.Error()
 			l.data.PreFill = LoginField{
@@ -56,13 +57,24 @@ func (l *loginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				Password: password,
 			}
 			http.Redirect(w, r, "/login", http.StatusFound)
-		} else {
-			cookie.Cookie{
-				Name: username,
-				Id:   id,
-			}.Set(w)
-			clearLoginForm(l.data)
-			http.Redirect(w, r, "/todolist", http.StatusFound)
 		}
+
+		err = crypto.Compare(encryptedPwd, password)
+		if err != nil {
+			l.data.Error = err.Error()
+			l.data.PreFill = LoginField{
+				Username: username,
+				Password: password,
+			}
+			http.Redirect(w, r, "/login", http.StatusFound)
+		}
+
+		cookie.Cookie{
+			Name: username,
+			Id:   id,
+		}.Set(w)
+		clearLoginForm(l.data)
+		http.Redirect(w, r, "/todolist", http.StatusFound)
+
 	}
 }

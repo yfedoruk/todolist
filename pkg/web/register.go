@@ -2,6 +2,7 @@ package web
 
 import (
 	"github.com/yfedoruck/todolist/pkg/cookie"
+	"github.com/yfedoruck/todolist/pkg/crypto"
 	"github.com/yfedoruck/todolist/pkg/env"
 	"github.com/yfedoruck/todolist/pkg/pg"
 	"github.com/yfedoruck/todolist/pkg/resp"
@@ -93,7 +94,7 @@ func (h *registerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.data.Error = RegisterErr{}
 		}
 
-		id := h.db.RegisterUser(password, username, email)
+		id := h.db.RegisterUser(username, crypto.Generate(password), email)
 
 		cookie.Cookie{
 			Name: username,

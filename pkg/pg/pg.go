@@ -77,19 +77,19 @@ func (p *Postgres) RegisterUser(username string, password string, email string) 
 	return lastInsertId
 }
 
-func (p *Postgres) LoginUser(username string, password string) (int, error) {
+func (p *Postgres) LoginUser(username string) (int, string, error) {
 
-	rows, err := p.db.Query("SELECT id, email FROM account WHERE username = $1 and password=$2 limit 1;", username, password)
+	rows, err := p.db.Query("SELECT id, password FROM account WHERE username = $1 limit 1;", username)
 	resp.Check(err)
 
 	if rows.Next() == false {
-		return 0, errors.New(lang.LoginErr)
+		return 0, "", errors.New(lang.LoginErr)
 	} else {
 		var id int
-		var email string
-		err = rows.Scan(&id, &email)
+		var password string
+		err = rows.Scan(&id, &password)
 		resp.Check(err)
-		return id, nil
+		return id, password, nil
 	}
 }
 
