@@ -1,7 +1,6 @@
 # Start from a Debian image with the latest version of Go installed
 # and a workspace (GOPATH) configured at /go.
 FROM golang:1.13.9-alpine3.11 AS builder
-#FROM golang:1.9.4-alpine3.7 AS builder
 
 # Copy the local package files to the container's workspace.
 WORKDIR /go/src/todolist
@@ -15,7 +14,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 #note: /go/src/todolist/bin/todolist is bad place, because of binded docker-compose volumes not have compiled binary
-RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/todolist
+RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/todolist /go/src/todolist/cmd/todolist
 
 FROM alpine:3.11
 RUN apk add --no-cache ca-certificates

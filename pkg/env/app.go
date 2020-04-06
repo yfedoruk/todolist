@@ -1,8 +1,10 @@
 package env
 
 import (
-	"github.com/yfedoruck/todolist/pkg/resp"
+	"log"
 	"os"
+	"path/filepath"
+	"runtime"
 )
 
 var baseDir string
@@ -12,10 +14,16 @@ func BasePath() string {
 		return baseDir
 	}
 
-	baseDir, err := os.Getwd()
-	resp.Check(err)
+	//baseDir, _ := os.Getwd()
+	_, b, _, ok := runtime.Caller(0)
+	if !ok {
+		log.Panic("Caller error")
+	}
+	envDir := filepath.Dir(b)
+	pkgDir := filepath.Dir(envDir)
+	appDir := filepath.Dir(pkgDir)
 
-	return baseDir
+	return appDir
 }
 
 func Domain() string {
